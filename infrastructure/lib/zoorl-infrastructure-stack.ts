@@ -1,7 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
-import { aws_s3 as s3 } from 'aws-cdk-lib';
 import { NetworkStack } from './network-stack';
 import { CoreMicroserviceStack } from './core/microservice-stack';
 
@@ -11,13 +10,38 @@ export class ZoorlInfrastructureStack extends cdk.Stack {
 
     const networkStack = new NetworkStack(this, "network");
 
-    const coreMicroserviceStack = new CoreMicroserviceStack(this, "core-microservice", {
-      vpc: networkStack.vpc
-    });
+    const restApi = this.buildRestApi();
 
-    // example resource
-    // const queue = new sqs.Queue(this, 'ZoorlInfrastructureQueue', {
-    //   visibilityTimeout: cdk.Duration.seconds(300)
-    // });
+    const coreMicroserviceStack = new CoreMicroserviceStack(this, "core-microservice", {
+      vpc: networkStack.vpc,
+      restApi: restApi
+    });
+  }
+  
+  private buildRestApi(): apigateway.RestApi {
+    const api = new apigateway.RestApi(this, 'api', {
+      restApiName: "Zoorl API",
+      description: 'Zoorl API',
+      deployOptions: {
+        stageName: 'dev',
+      },
+      // 👇 enable CORS
+      defaultCorsPreflightOptions: {
+        allowHeaders: [
+          'Content-Type',
+          'X-Amz-Date',
+          'Authorization',
+          'X-Api-Key',
+        ],
+        allowMethods: ['OPTIONS', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        allowCredentials: true,
+        allowOrigins: ['*'],
+      },
+    });
+  
+    // 👇 create an Output for the API URL
+    new cdk.CfnOutput(this, 'apiUrl', {value: api.url});
+
+    return api;
   }
 }

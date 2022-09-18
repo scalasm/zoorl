@@ -2,20 +2,27 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
-import * as apigw from 'aws-cdk-lib/aws-apigateway';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as cdk from 'aws-cdk-lib';
 import * as constructs from 'constructs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as iam from 'aws-cdk-lib/aws-iam';
-import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as pylambda from '@aws-cdk/aws-lambda-python-alpha';
 import * as ddb from 'aws-cdk-lib/aws-dynamodb';
 import path = require('path');
-import { S3DataDistributionType } from 'aws-cdk-lib/aws-stepfunctions-tasks';
 
+/**
+ * Configuration properties for the CoreMicroserviceStack.
+ */
 export interface CoreMicroserviceStackProps extends cdk.NestedStackProps {
+  /**
+   * Target VPC where lambda functions and other resources will be created.
+   */
   readonly vpc: ec2.IVpc;
+  /**
+   * Target API Gateway REST API under which the resources will be created. 
+   */
+  readonly restApi: apigateway.RestApi;
 }
 
 /**
@@ -57,7 +64,9 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
       entry: '../src/zoorl/',
       handler: 'handle',
       environment: {
-        URL_HASHES_TABLE: urlHashesTable.tableName
+        URL_HASHES_TABLE: urlHashesTable.tableName,
+        POWERTOOLS_SERVICE_NAME: "zoorl",
+        LOG_LEVEL: "INFO"
       },
       // Functions are pretty quick, so this is quite conservative
       timeout: cdk.Duration.seconds(5)
@@ -75,8 +84,22 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
     });
     urlHashesTable.grantReadData(readUrlHashFunction);
 
-    // TODO Map lambda functions to REST APIs
+    // Map Lambda function to REST API resources
+    const urlHashesResource = props.restApi.root.addResource('u');
+
+    // GET /u/{url_hash}
+    urlHashesResource.addResource("{url_hash}").addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(readUrlHashFunction, {proxy: true}),
+    );
+
+    // POST /u
+    urlHashesResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(createUrlHashFunction, {proxy: true}),
+    );
 
     // TODO Add security restrictions for everything but the lookup / redirect endpoints
   }
 }
+
