@@ -87,16 +87,16 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
     // Map Lambda function to REST API resources
     const urlHashesResource = props.restApi.root.addResource('u');
 
-    // GET /u/{url_hash}
-    urlHashesResource.addResource("{url_hash}").addMethod(
-      'GET',
-      new apigateway.LambdaIntegration(readUrlHashFunction, {proxy: true}),
-    );
-
     // POST /u
     urlHashesResource.addMethod(
       'POST',
       new apigateway.LambdaIntegration(createUrlHashFunction, {proxy: true}),
+    );
+
+    // GET /u/{url_hash}
+    urlHashesResource.addResource("{url_hash}").addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(readUrlHashFunction, {proxy: true}),
     );
 
     // TODO Add security restrictions for everything but the lookup / redirect endpoints
