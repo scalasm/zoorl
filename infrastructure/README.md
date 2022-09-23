@@ -5,9 +5,14 @@ DynamoDB tables, and function definitions.
 
 Note that the Lambda functions code is host inside the `src` folder in project root.
 
-# How to deploy the stack 
+# Deploy
 
-## Inside the current accoutn for a profile
 ```
 npm run cdk:deploy -- --profile development
+```
+
+# Destroy stack
+
+```
+npm run cdk:destroy -- --profile development
 ```
