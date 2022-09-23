@@ -72,6 +72,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
       timeout: cdk.Duration.seconds(5)
     }
 
+    // We define the JSON Schema for the transformed valid response
     const createUrlHashFunction = new pylambda.PythonFunction(this, 'create-url-hash-function', {
       ...defaultFunctionSettings,
       index: 'zoorl/adapters/create_url_hash_handler.py',
@@ -88,18 +89,57 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
     const urlHashesResource = props.restApi.root.addResource('u');
 
     // POST /u
+    const createUrlHashModel = props.restApi.addModel('CreateUrlHashRequestModel',
+      this.createModelSchema("CreateUrlHashRequestModel", {
+        url: { type: apigateway.JsonSchemaType.STRING },
+        ttl: { type: apigateway.JsonSchemaType.INTEGER }
+      },
+        ["url"]
+    ));
+
+    const requestValidator = new apigateway.RequestValidator(this, 'ZoorlRequestValidator', {
+      restApi: props.restApi,
+      requestValidatorName: 'Validate Payload and parameters',
+      validateRequestBody: true,
+      validateRequestParameters: true,
+    });
+
     urlHashesResource.addMethod(
       'POST',
-      new apigateway.LambdaIntegration(createUrlHashFunction, {proxy: true}),
-    );
+      new apigateway.LambdaIntegration(createUrlHashFunction, { proxy: true }), {
+      requestModels: {
+        "application/json": createUrlHashModel
+      },
+      requestValidator: requestValidator,
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseModels: { "application/json": apigateway.Model.EMPTY_MODEL }
+        }
+      ]
+    });
 
     // GET /u/{url_hash}
     urlHashesResource.addResource("{url_hash}").addMethod(
       'GET',
-      new apigateway.LambdaIntegration(readUrlHashFunction, {proxy: true}),
+      new apigateway.LambdaIntegration(readUrlHashFunction, { proxy: true })
     );
 
     // TODO Add security restrictions for everything but the lookup / redirect endpoints
+  }
+
+  private createModelSchema(modelName: string, properties: { [name: string]: apigateway.JsonSchema; }, requiredProperties: string[] = []): apigateway.ModelOptions {
+    return {
+      contentType: 'application/json',
+      modelName: modelName,
+      schema: {
+        schema: apigateway.JsonSchemaVersion.DRAFT4,
+        title: modelName,
+        type: apigateway.JsonSchemaType.OBJECT,
+        properties: properties,
+        required: requiredProperties
+      }
+    };
   }
 }
 
