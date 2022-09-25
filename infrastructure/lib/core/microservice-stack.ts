@@ -11,6 +11,8 @@ import * as pylambda from '@aws-cdk/aws-lambda-python-alpha';
 import * as ddb from 'aws-cdk-lib/aws-dynamodb';
 import path = require('path');
 
+import { jsonSchema } from '../shared/common-utils';
+
 /**
  * Configuration properties for the CoreMicroserviceStack.
  */
@@ -90,12 +92,15 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
 
     // POST /u
     const createUrlHashModel = props.restApi.addModel('CreateUrlHashRequestModel',
-      this.createModelSchema("CreateUrlHashRequestModel", {
-        url: { type: apigateway.JsonSchemaType.STRING },
-        ttl: { type: apigateway.JsonSchemaType.INTEGER }
-      },
-        ["url"]
-    ));
+      jsonSchema({
+        modelName: "CreateUrlHashRequestModel", 
+        properties: {
+          url: { type: apigateway.JsonSchemaType.STRING },
+          ttl: { type: apigateway.JsonSchemaType.INTEGER }
+        },
+        requiredProperties: ["url"]
+      })
+    );
 
     const requestValidator = new apigateway.RequestValidator(this, 'ZoorlRequestValidator', {
       restApi: props.restApi,
@@ -126,20 +131,6 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
     );
 
     // TODO Add security restrictions for everything but the lookup / redirect endpoints
-  }
-
-  private createModelSchema(modelName: string, properties: { [name: string]: apigateway.JsonSchema; }, requiredProperties: string[] = []): apigateway.ModelOptions {
-    return {
-      contentType: 'application/json',
-      modelName: modelName,
-      schema: {
-        schema: apigateway.JsonSchemaVersion.DRAFT4,
-        title: modelName,
-        type: apigateway.JsonSchemaType.OBJECT,
-        properties: properties,
-        required: requiredProperties
-      }
-    };
   }
 }
 
