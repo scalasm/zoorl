@@ -2,6 +2,7 @@ import boto3
 import os
 
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from aws_lambda_powertools.utilities.data_classes.api_gateway_authorizer_event import APIGatewayAuthorizerRequestEvent
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
@@ -38,12 +39,21 @@ def handle(url_hash: str) -> dict:
     logger.info(f"Got response for hash \"{url_hash}\": {response.url} .")
 
     return {
-        "url": response.url
+        "statusCode": 301,
+        "headers": {
+            "Location": response.url
+        }
     }
 
-@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
+@logger.inject_lambda_context(correlation_id_path=correlation_paths.LAMBDA_FUNCTION_URL, log_event=True)
 @tracer.capture_lambda_handler
-def handle(event: dict, context: LambdaContext) -> dict:
+def handle(event: APIGatewayAuthorizerRequestEvent, context: LambdaContext) -> dict:
+    logger.info(f"Context \"{context}\" .")
+
     logger.debug(f"Correlation ID => {logger.get_correlation_id()}")
     
-    return app.resolve(event, context)
+    response = app.resolve(event, context)
+
+    logger.info(f"Response \"{response}\" .")
+
+    return response

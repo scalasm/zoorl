@@ -1,3 +1,5 @@
+"""Unit tests for read url hash usecase."""
+
 import pytest
 from pytest_mock import MockerFixture
 from unittest.mock import Mock

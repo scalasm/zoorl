@@ -12,7 +12,7 @@ DEFAULT_TTL = 24
 @dataclass
 class CreateUrlHashUseCaseRequest:
     url: str
-    ttl: Optional[int]
+    ttl: Optional[int] = None
 
 @dataclass
 class CreateUrlHashUseCaseResponse:
@@ -21,10 +21,19 @@ class CreateUrlHashUseCaseResponse:
     ttl: int
 
 class CreateUrlHashUseCase:
+    """Use case for creating a new URL hash."""
     def __init__(self, url_hash_repository: UrlHashRepository) -> None:
         self.url_hash_repository = url_hash_repository
     
     def create(self, request: CreateUrlHashUseCaseRequest) -> CreateUrlHashUseCaseResponse:
+        """Create a URL hash.
+        
+        Args:
+            request: URL and (optional) TTL
+        
+        Returns:
+            the URL hash information.
+        """
         ttl = request.ttl or DEFAULT_TTL
 
         url_hash = UrlHash(
