@@ -1,3 +1,5 @@
+"""Repository port for accessing URL Hash model entities."""
+
 from abc import ABC, abstractmethod
 from typing import Optional
 
