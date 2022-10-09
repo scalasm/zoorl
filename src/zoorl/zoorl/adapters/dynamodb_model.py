@@ -2,7 +2,7 @@ from typing import Any, Optional
 from mypy_boto3_dynamodb.service_resource import Table
 
 from zoorl.core.model import UrlHash
-from zoorl.core.model import UrlHashRepository
+from zoorl.ports.repository import UrlHashRepository
 
 
 class DynamoDBUrlHashRepository(UrlHashRepository):

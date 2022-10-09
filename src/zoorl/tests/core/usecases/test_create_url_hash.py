@@ -10,7 +10,7 @@ from zoorl.core.usecases.create_url_hash import (
     DEFAULT_TTL
 )
 
-from zoorl.core.model import UrlHashRepository
+from zoorl.ports.repository import UrlHashRepository
 
 # Shortcut for the package that contains a few functions we want to mock
 ZOORL_PACKAGE = "zoorl.core.usecases.create_url_hash"

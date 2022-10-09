@@ -10,8 +10,9 @@ Zoorl business logic is implemented using clean architecture package layout with
 
 There are three main packages
 - `core` - contains data model entities, use cases and utility classes
-- `port` - contains the lambda functions that invoke the use cases and deal with AWS concerns like metrics. 
-- `adapter` - contains the adapters for accessing data (essentially DynamoDB)
+- `ports` - contains the repository interfaces that we use for manipulating the data
+- `adapters` - contains the adapters, essentially AWS DynamoDB repository implementation and 
+  AWS Lambda functions that wrap use cases execution.
 
 # Limits and compromises
 

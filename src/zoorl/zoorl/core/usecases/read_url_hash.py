@@ -1,14 +1,7 @@
 """Read an hash for a given URL."""
 
 from dataclasses import dataclass
-from typing import Optional
-from zoorl.core.model import UrlHash
-from zoorl.core.model import UrlHashRepository
-from zoorl.core.utils import compute_epoch_time_from_ttl
-from zoorl.core.utils import compute_hash
-
-# Default TTL is 1 day (24 hours)
-DEFAULT_TTL = 24
+from zoorl.ports.repository import UrlHashRepository
 
 @dataclass
 class ReadUrlHashUseCaseRequest:

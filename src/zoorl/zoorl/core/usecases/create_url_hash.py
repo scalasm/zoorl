@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from zoorl.core.model import UrlHash
-from zoorl.core.model import UrlHashRepository
+from zoorl.ports.repository import UrlHashRepository
 from zoorl.core.utils import compute_epoch_time_from_ttl
 from zoorl.core.utils import compute_hash
 

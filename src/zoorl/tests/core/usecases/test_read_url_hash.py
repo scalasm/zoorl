@@ -10,7 +10,7 @@ from zoorl.core.usecases.read_url_hash import (
     UrlHashNotFoundError
 )
 
-from zoorl.core.model import UrlHashRepository
+from zoorl.ports.repository import UrlHashRepository
 from zoorl.core.model import UrlHash
 
 
