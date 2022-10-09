@@ -7,18 +7,32 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
 import { NetworkStack } from './network-stack';
 import { CoreMicroserviceStack } from './core/microservice-stack';
+import { AuthStack } from './auth-stack';
 
+/**
+ * Application stack per Zoorl is composed by:
+ *  - VPC - private subnets and routes to DynamoDB and AWS S3
+ *  - Cognito User and Identity pools
+ *  - REST API on AWS API Gateway
+ *  - Core microservice exposed as resource ("/u") on the REST API 
+ */
 export class ZoorlInfrastructureStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const networkStack = new NetworkStack(this, "network");
 
-    const restApi = this.buildRestApi();
+    const authStack = new AuthStack(this, "auth");
 
-    const coreMicroserviceStack = new CoreMicroserviceStack(this, "core-microservice", {
+    const restApi = this.buildRestApi();
+    const restApiAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, "UrlShortenerFunctionAuthorizer", {
+      cognitoUserPools: [authStack.userPool]
+    });
+
+    new CoreMicroserviceStack(this, "core-microservice", {
       vpc: networkStack.vpc,
-      restApi: restApi
+      restApi: restApi,
+      authorizer: restApiAuthorizer
     });
   }
   
@@ -42,7 +56,7 @@ export class ZoorlInfrastructureStack extends cdk.Stack {
         allowOrigins: ['*'],
       },
     });
-  
+
     // 👇 create an Output for the API URL
     new cdk.CfnOutput(this, 'apiUrl', {value: api.url});
 
