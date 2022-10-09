@@ -60,4 +60,4 @@ def test_url_hash_not_found_throws_exception(usecase: ReadUrlHashUseCase, mock_u
         )
 
     assert exception_info.type == UrlHashNotFoundError
-    assert str(exception_info.value) == "No such hash found or it has expired!"
+    assert str(exception_info.value) == "The specified URL hash is invalid or expired!"

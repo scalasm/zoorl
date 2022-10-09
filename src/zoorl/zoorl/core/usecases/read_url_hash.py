@@ -50,6 +50,6 @@ class ReadUrlHashUseCase:
         url_hash = self.url_hash_repository.get_by_hash(request.hash)
 
         if not url_hash:
-            raise UrlHashNotFoundError("No such hash found or it has expired!")
+            raise UrlHashNotFoundError("The specified URL hash is invalid or expired!")
 
         return ReadUrlHashUseCaseResponse(url_hash=url_hash.hash, url=url_hash.url, ttl=url_hash.ttl)
