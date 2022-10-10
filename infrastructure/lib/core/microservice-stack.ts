@@ -12,6 +12,7 @@ import * as ddb from 'aws-cdk-lib/aws-dynamodb';
 import path = require('path');
 
 import { jsonSchema } from '../shared/common-utils';
+import { read } from 'fs';
 
 /**
  * Configuration properties for the CoreMicroserviceStack.
@@ -33,7 +34,7 @@ export interface CoreMicroserviceStackProps extends cdk.NestedStackProps {
 }
 
 /**
- * Typed interface for the shared settings for the lambda functions we use in this microservice.
+ * (internal) Typed interface for the shared settings for the lambda functions we use in this microservice.
  */
 interface DefaultLambdaSettings {
   vpc: cdk.aws_ec2.IVpc; 
@@ -58,6 +59,9 @@ interface DefaultLambdaSettings {
  *    to trigger browser redirection. 
  */
 export class CoreMicroserviceStack extends cdk.NestedStack {
+  public readonly createUrlHashFunctionName: cdk.CfnOutput;
+  public readonly readUrlHashFunctionName: cdk.CfnOutput;
+
   private readonly urlHashesTable: ddb.Table;
 
   private readonly urlHashesResource: apigateway.Resource;
@@ -103,12 +107,18 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
 
     this.urlHashesResource = props.restApi.root.addResource('u');
 
-    this.bindCreateUrlHashFunction(props);
+    const createUrlHashFunction = this.bindCreateUrlHashFunction(props);
+    this.createUrlHashFunctionName = new cdk.CfnOutput(this, "createurlhashfn-name", {
+      value: createUrlHashFunction.functionName
+    });
 
-    this.bindReadUrlHashFunction(props);
+    const readUrlHashFunction = this.bindReadUrlHashFunction(props);
+    this.readUrlHashFunctionName = new cdk.CfnOutput(this, "readurlhashfn-name", {
+      value: readUrlHashFunction.functionName
+    })
   }
 
-  private bindCreateUrlHashFunction(props: CoreMicroserviceStackProps) {
+  private bindCreateUrlHashFunction(props: CoreMicroserviceStackProps): lambda.Function {
     const createUrlHashFunction = new pylambda.PythonFunction(this, 'create-url-hash-function', {
       ...this.defaultFunctionSettings,
       index: 'zoorl/adapters/create_url_hash_handler.py',
@@ -166,9 +176,11 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
         ]
       }
     );
+
+    return createUrlHashFunction;
   }
   
-  private bindReadUrlHashFunction(props: CoreMicroserviceStackProps) {
+  private bindReadUrlHashFunction(props: CoreMicroserviceStackProps): lambda.Function {
     const readUrlHashFunction = new pylambda.PythonFunction(this, 'read-url-hash-function', {
       ...this.defaultFunctionSettings,
       index: 'zoorl/adapters/read_url_hash_handler.py',
@@ -201,6 +213,8 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
         ]
       }
     );
+
+    return readUrlHashFunction;
   }
 }
 

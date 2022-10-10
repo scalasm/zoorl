@@ -6,8 +6,14 @@ import * as cdk from 'aws-cdk-lib';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
 import { NetworkStack } from './network-stack';
-import { CoreMicroserviceStack } from './core/microservice-stack';
 import { AuthStack } from './auth-stack';
+import { CoreMicroserviceStack } from './core/microservice-stack';
+import { ObservabilityStack } from './observability-stack';
+
+export interface ZoorlInfrastructureStackProps extends cdk.StackProps {
+  readonly stage: string;
+}
+
 
 /**
  * Application stack per Zoorl is composed by:
@@ -17,7 +23,7 @@ import { AuthStack } from './auth-stack';
  *  - Core microservice exposed as resource ("/u") on the REST API 
  */
 export class ZoorlInfrastructureStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: ZoorlInfrastructureStackProps) {
     super(scope, id, props);
 
     const networkStack = new NetworkStack(this, "network");
@@ -29,10 +35,15 @@ export class ZoorlInfrastructureStack extends cdk.Stack {
       cognitoUserPools: [authStack.userPool]
     });
 
-    new CoreMicroserviceStack(this, "core-microservice", {
+    const coreMicroserviceStack = new CoreMicroserviceStack(this, "core-microservice", {
       vpc: networkStack.vpc,
       restApi: restApi,
       authorizer: restApiAuthorizer
+    });
+
+    new ObservabilityStack(this, "observability", {
+      stage: props.stage,
+      functionName: coreMicroserviceStack.createUrlHashFunctionName.value
     });
   }
   
@@ -58,7 +69,9 @@ export class ZoorlInfrastructureStack extends cdk.Stack {
     });
 
     // 👇 create an Output for the API URL
-    new cdk.CfnOutput(this, 'apiUrl', {value: api.url});
+    new cdk.CfnOutput(this, 'apiUrl', {
+      value: api.url
+    });
 
     return api;
   }
