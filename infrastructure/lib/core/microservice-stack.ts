@@ -9,10 +9,10 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as pylambda from '@aws-cdk/aws-lambda-python-alpha';
 import * as ddb from 'aws-cdk-lib/aws-dynamodb';
-import path = require('path');
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 
 import { jsonSchema } from '../shared/common-utils';
-import { read } from 'fs';
+import { IObservabilityContributor, ObservabilityHelper } from '../shared/common-observability';
 
 /**
  * Configuration properties for the CoreMicroserviceStack.
@@ -58,15 +58,15 @@ interface DefaultLambdaSettings {
  *  * GET /u/{hash} - Lookup a URL hash and, if found, returns an HTTP 301 Permanently Moved
  *    to trigger browser redirection. 
  */
-export class CoreMicroserviceStack extends cdk.NestedStack {
-  public readonly createUrlHashFunctionName: cdk.CfnOutput;
-  public readonly readUrlHashFunctionName: cdk.CfnOutput;
-
+export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabilityContributor {
   private readonly urlHashesTable: ddb.Table;
 
   private readonly urlHashesResource: apigateway.Resource;
 
   private readonly defaultFunctionSettings: DefaultLambdaSettings;
+
+  private readonly createUrlHashFunction: lambda.IFunction;
+  private readonly readUrlHashFunction: lambda.IFunction;
 
   constructor(scope: constructs.Construct, id: string, props: CoreMicroserviceStackProps) {
     super(scope, id, props);
@@ -107,15 +107,23 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
 
     this.urlHashesResource = props.restApi.root.addResource('u');
 
-    const createUrlHashFunction = this.bindCreateUrlHashFunction(props);
-    this.createUrlHashFunctionName = new cdk.CfnOutput(this, "createurlhashfn-name", {
-      value: createUrlHashFunction.functionName
+    this.createUrlHashFunction = this.bindCreateUrlHashFunction(props);
+
+    this.readUrlHashFunction = this.bindReadUrlHashFunction(props);
+  }
+
+  contributeWidgets(dashboard: cloudwatch.Dashboard): void {
+    const observabilityHelper = new ObservabilityHelper(dashboard);
+
+    observabilityHelper.createLambdaFunctionSection({
+      functionName: this.createUrlHashFunction.functionName,
+      functionNameDescription: "Create URL Hash"
     });
 
-    const readUrlHashFunction = this.bindReadUrlHashFunction(props);
-    this.readUrlHashFunctionName = new cdk.CfnOutput(this, "readurlhashfn-name", {
-      value: readUrlHashFunction.functionName
-    })
+    observabilityHelper.createLambdaFunctionSection({
+      functionName: this.readUrlHashFunction.functionName,
+      functionNameDescription: "Read URL Hash"
+    });
   }
 
   private bindCreateUrlHashFunction(props: CoreMicroserviceStackProps): lambda.Function {

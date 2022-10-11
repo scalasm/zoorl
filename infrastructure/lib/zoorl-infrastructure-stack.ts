@@ -10,7 +10,13 @@ import { AuthStack } from './auth-stack';
 import { CoreMicroserviceStack } from './core/microservice-stack';
 import { ObservabilityStack } from './observability-stack';
 
+/**
+ * Configuration properties for ZoorlInfrastructureStack instances.
+ */
 export interface ZoorlInfrastructureStackProps extends cdk.StackProps {
+  /**
+   * Stage name for the stack (e.g., "dev", "prod", ...)
+   */
   readonly stage: string;
 }
 
@@ -35,16 +41,18 @@ export class ZoorlInfrastructureStack extends cdk.Stack {
       cognitoUserPools: [authStack.userPool]
     });
 
-    const coreMicroserviceStack = new CoreMicroserviceStack(this, "core-microservice", {
-      vpc: networkStack.vpc,
-      restApi: restApi,
-      authorizer: restApiAuthorizer
-    });
+    const observableStacks = [
+      new CoreMicroserviceStack(this, "core-microservice", {
+        vpc: networkStack.vpc,
+        restApi: restApi,
+        authorizer: restApiAuthorizer
+      })
+    ]
 
-    new ObservabilityStack(this, "observability", {
-      stage: props.stage,
-      functionName: coreMicroserviceStack.createUrlHashFunctionName.value
+    const observabilityStack = new ObservabilityStack(this, "observability", {
+      stage: props.stage
     });
+    observabilityStack.hookDashboardContributions(observableStacks);
   }
   
   private buildRestApi(): apigateway.RestApi {
