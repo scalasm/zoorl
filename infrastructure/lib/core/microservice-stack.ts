@@ -9,10 +9,10 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as pylambda from '@aws-cdk/aws-lambda-python-alpha';
 import * as ddb from 'aws-cdk-lib/aws-dynamodb';
-import path = require('path');
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 
 import { jsonSchema } from '../shared/common-utils';
-import { Default } from 'aws-cdk-lib/region-info';
+import { IObservabilityContributor, ObservabilityHelper } from '../shared/common-observability';
 
 /**
  * Configuration properties for the CoreMicroserviceStack.
@@ -26,10 +26,15 @@ export interface CoreMicroserviceStackProps extends cdk.NestedStackProps {
    * Target API Gateway REST API under which the resources will be created. 
    */
   readonly restApi: apigateway.RestApi;
+
+  /**
+   * Authorizer for API calls - if endpoints are to be protected, this is the authorizer to use.
+   */
+  readonly authorizer: apigateway.Authorizer;
 }
 
 /**
- * Typed interface for the shared settings for the lambda functions we use in this microservice.
+ * (internal) Typed interface for the shared settings for the lambda functions we use in this microservice.
  */
 interface DefaultLambdaSettings {
   vpc: cdk.aws_ec2.IVpc; 
@@ -48,25 +53,23 @@ interface DefaultLambdaSettings {
  * Core Zoorl logic for managing the creation of URL hashes and their retrieval through 
  * a RESTful API.
  * 
- * It provides two endpoints:
- *  * Create a new URL hash
- *  * Lookup a URL hash and get the
- * 
- * Additional behavior, like HTTP redirect, is performed through AWS API Gateway transforms.
+ * It provides a new resource "/u" and two endpoints:
+ *  * POST /u - creates a new URL hash
+ *  * GET /u/{hash} - Lookup a URL hash and, if found, returns an HTTP 301 Permanently Moved
+ *    to trigger browser redirection. 
  */
-export class CoreMicroserviceStack extends cdk.NestedStack {
-  private readonly restApi: apigateway.RestApi;
-
+export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabilityContributor {
   private readonly urlHashesTable: ddb.Table;
 
   private readonly urlHashesResource: apigateway.Resource;
 
   private readonly defaultFunctionSettings: DefaultLambdaSettings;
 
+  private readonly createUrlHashFunction: lambda.IFunction;
+  private readonly readUrlHashFunction: lambda.IFunction;
+
   constructor(scope: constructs.Construct, id: string, props: CoreMicroserviceStackProps) {
     super(scope, id, props);
-    
-    this.restApi = props.restApi;
 
     this.urlHashesTable = new ddb.Table(this, "UrlHashesTable", {
       tableName: "UrlHashes",
@@ -102,17 +105,28 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
       timeout: cdk.Duration.seconds(5)
     }
 
-    // Map Lambda function to REST API resources
     this.urlHashesResource = props.restApi.root.addResource('u');
 
-    this.bindCreateUrlHashFunction();
+    this.createUrlHashFunction = this.bindCreateUrlHashFunction(props);
 
-    this.bindReadUrlHashFunction();
-
-    // TODO Add security restrictions for everything but the lookup / redirect endpoints
+    this.readUrlHashFunction = this.bindReadUrlHashFunction(props);
   }
 
-  private bindCreateUrlHashFunction() {
+  contributeWidgets(dashboard: cloudwatch.Dashboard): void {
+    const observabilityHelper = new ObservabilityHelper(dashboard);
+
+    observabilityHelper.createLambdaFunctionSection({
+      functionName: this.createUrlHashFunction.functionName,
+      functionNameDescription: "Create URL Hash"
+    });
+
+    observabilityHelper.createLambdaFunctionSection({
+      functionName: this.readUrlHashFunction.functionName,
+      functionNameDescription: "Read URL Hash"
+    });
+  }
+
+  private bindCreateUrlHashFunction(props: CoreMicroserviceStackProps): lambda.Function {
     const createUrlHashFunction = new pylambda.PythonFunction(this, 'create-url-hash-function', {
       ...this.defaultFunctionSettings,
       index: 'zoorl/adapters/create_url_hash_handler.py',
@@ -120,7 +134,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
     this.urlHashesTable.grantWriteData(createUrlHashFunction);
 
     // POST /u
-    const requestModel = this.restApi.addModel('CreateUrlHashRequestModel',
+    const requestModel = props.restApi.addModel('CreateUrlHashRequestModel',
       jsonSchema({
         modelName: "CreateUrlHashRequestModel",
         properties: {
@@ -131,7 +145,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
       })
     );
 
-    const responseModel = this.restApi.addModel('CreateUrlHashResponseModel',
+    const responseModel = props.restApi.addModel('CreateUrlHashResponseModel',
       jsonSchema({
         modelName: "CreateUrlHashResponseModel",
         properties: {
@@ -144,7 +158,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
     );
 
     const requestValidator = new apigateway.RequestValidator(this, 'ZoorlRequestValidator', {
-      restApi: this.restApi,
+      restApi: props.restApi,
       requestValidatorName: 'Validate Payload and parameters',
       validateRequestBody: true,
       validateRequestParameters: true,
@@ -153,6 +167,9 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
     this.urlHashesResource.addMethod(
       'POST',
       new apigateway.LambdaIntegration(createUrlHashFunction, { proxy: true }), {
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+        authorizer: props.authorizer,
+
         requestModels: {
           "application/json": requestModel
         },
@@ -167,16 +184,18 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
         ]
       }
     );
+
+    return createUrlHashFunction;
   }
   
-  private bindReadUrlHashFunction() {
+  private bindReadUrlHashFunction(props: CoreMicroserviceStackProps): lambda.Function {
     const readUrlHashFunction = new pylambda.PythonFunction(this, 'read-url-hash-function', {
       ...this.defaultFunctionSettings,
       index: 'zoorl/adapters/read_url_hash_handler.py',
     });
     this.urlHashesTable.grantReadData(readUrlHashFunction);
 
-    const http404NotFoundResponseModel = this.restApi.addModel('Http404ResponseModel',
+    const http404NotFoundResponseModel = props.restApi.addModel('Http404ResponseModel',
       jsonSchema({
         modelName: "Http404ResponseModel",
         properties: {
@@ -190,6 +209,8 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
     this.urlHashesResource.addResource("{url_hash}").addMethod(
       'GET',
       new apigateway.LambdaIntegration(readUrlHashFunction, { proxy: true }), {
+        authorizationType: apigateway.AuthorizationType.NONE,
+
         methodResponses: [
           {
             statusCode: "404",
@@ -200,6 +221,8 @@ export class CoreMicroserviceStack extends cdk.NestedStack {
         ]
       }
     );
+
+    return readUrlHashFunction;
   }
 }
 
