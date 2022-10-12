@@ -124,6 +124,11 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
       function: this.readUrlHashFunction,
       descriptiveName: "Read URL Hash",
     });
+
+    observabilityHelper.createDynamoDBTableSection({
+      table: this.urlHashesTable,
+      descriptiveName: "URL hashes table",
+    });
   }
 
   private bindCreateUrlHashFunction(props: CoreMicroserviceStackProps): lambda.Function {
