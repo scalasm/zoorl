@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import 'source-map-support/register';
-import * as cdk from 'aws-cdk-lib';
-import { ZoorlInfrastructureStack } from '../lib/zoorl-infrastructure-stack';
+import "source-map-support/register";
+import * as cdk from "aws-cdk-lib";
+import { ZoorlInfrastructureStack } from "../lib/zoorl-infrastructure-stack";
 
 const app = new cdk.App();
-new ZoorlInfrastructureStack(app, 'ZoorlInfrastructureStack', {
-  stage: "dev"
+new ZoorlInfrastructureStack(app, "ZoorlInfrastructureStack", {
+  stage: "dev",
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */
