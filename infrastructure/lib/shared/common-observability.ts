@@ -6,6 +6,7 @@ import * as cdk from "aws-cdk-lib";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import { Dashboard, Metric, GraphWidget, TextWidget } from "aws-cdk-lib/aws-cloudwatch";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as ddb from "aws-cdk-lib/aws-dynamodb";
 
 /**
  * Half horizontal screen space within a Cloudwatch dashboard space.
@@ -18,10 +19,9 @@ export const SIZE_HALF_WIDTH = 12;
 export const SIZE_FULL_WIDTH = 2 * SIZE_HALF_WIDTH;
 
 /**
- * Standard resolution for non-custom Cloudwatch metrics is 5 minutes, to be uniform with
- * CDK defaults for Lambda functions.
+ * Standard resolution for non-custom Cloudwatch metrics is 1 (one) minute.
  */
-export const STANDARD_RESOLUTION = cdk.Duration.minutes(5);
+export const STANDARD_RESOLUTION = cdk.Duration.minutes(1);
 
 /**
  * High resolution for non-custom Cloudwatch metrics is 1 (one) second.
@@ -40,10 +40,23 @@ export interface IObservabilityContributor {
   contributeWidgets(dashboard: Dashboard): void;
 }
 
+interface BaseSectionProps {
+  /**
+   * A human-readable name that will be used in the section title.
+   */
+  readonly descriptiveName: string;
+
+  /**
+   * An optional description - if not provided, a default one will be set.
+   * Note that you can use markdown syntax here: it will be injected inside the description.
+   */
+  readonly description?: string;
+}
+
 /**
  * Configuration properties for creating a section for monitoring a specific function.
  */
-export interface LambdaFunctionSectionProps {
+export interface LambdaFunctionSectionProps extends BaseSectionProps {
   /**
    * The function name is the lambda function id (e.g., typically from CFN).
    */
@@ -53,12 +66,13 @@ export interface LambdaFunctionSectionProps {
    * A human-readable name for function (e.g. "Create URL Hash")
    */
   readonly descriptiveName: string;
+}
 
-  /**
-   * An optional description - if not provided, a default one will be set.
-   * Note that you can use markdown syntax here: it will be injected inside the description.
-   */
-  readonly description?: string;
+/**
+ * Configuration properties for Cloudwatch section about a DynamoDB table.
+ */
+export interface DynamoDBTableSectionProps extends BaseSectionProps {
+  readonly table: ddb.Table;
 }
 
 /**
@@ -93,8 +107,11 @@ ${description}
       new GraphWidget({
         title: "AWS Function Invocations, Errors, and throttles",
         width: SIZE_HALF_WIDTH,
-        left: [props.function.metricErrors(), props.function.metricInvocations()],
-        right: [props.function.metricThrottles()],
+        left: [
+          props.function.metricErrors({ period: STANDARD_RESOLUTION }),
+          props.function.metricInvocations({ period: STANDARD_RESOLUTION }),
+        ],
+        right: [props.function.metricThrottles({ period: STANDARD_RESOLUTION })],
       }),
       new GraphWidget({
         title: "AWS Function URL Request Duration and Latency (p99)",
@@ -127,6 +144,36 @@ ${description}
             label: "Max",
             period: STANDARD_RESOLUTION,
           }),
+        ],
+      })
+    );
+  }
+
+  public createDynamoDBTableSection(props: DynamoDBTableSectionProps): void {
+    const description = props.description || "Performance monitors for this DynamoDB table.";
+
+    this.dashboard.addWidgets(
+      new TextWidget({
+        markdown: `
+# Table: ${props.descriptiveName} 
+${description}
+
+## Metadata
+* Table name: ${props.table.tableName}
+* Table ARN: ${props.table.tableArn}
+`,
+        width: SIZE_FULL_WIDTH,
+        height: 4, // Increase this if you want to avoid vscrolls for long text
+      })
+    );
+
+    this.dashboard.addWidgets(
+      new GraphWidget({
+        title: "DynamoDB Table consumed WCU/RCU",
+        width: SIZE_FULL_WIDTH,
+        left: [
+          props.table.metricConsumedReadCapacityUnits({ period: STANDARD_RESOLUTION }),
+          props.table.metricConsumedWriteCapacityUnits({ period: STANDARD_RESOLUTION }),
         ],
       })
     );
