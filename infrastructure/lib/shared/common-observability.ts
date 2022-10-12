@@ -5,6 +5,8 @@
 import * as cdk from "aws-cdk-lib";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import { Dashboard, Metric, GraphWidget, TextWidget } from "aws-cdk-lib/aws-cloudwatch";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as ddb from "aws-cdk-lib/aws-dynamodb";
 
 /**
  * Half horizontal screen space within a Cloudwatch dashboard space.
@@ -38,25 +40,39 @@ export interface IObservabilityContributor {
   contributeWidgets(dashboard: Dashboard): void;
 }
 
-/**
- * Configuration properties for creating a section for monitoring a specific function.
- */
-export interface LambdaFunctionSectionProps {
+interface BaseSectionProps {
   /**
-   * The function name is the lambda function id (e.g., typically from CFN).
+   * A human-readable name that will be used in the section title.
    */
-  readonly functionName: string;
-
-  /**
-   * A human-readable name for function (e.g. "Create URL Hash")
-   */
-  readonly functionNameDescription: string;
+  readonly descriptiveName: string;
 
   /**
    * An optional description - if not provided, a default one will be set.
    * Note that you can use markdown syntax here: it will be injected inside the description.
    */
   readonly description?: string;
+}
+
+/**
+ * Configuration properties for creating a section for monitoring a specific function.
+ */
+export interface LambdaFunctionSectionProps extends BaseSectionProps {
+  /**
+   * The function name is the lambda function id (e.g., typically from CFN).
+   */
+  readonly function: lambda.IFunction;
+
+  /**
+   * A human-readable name for function (e.g. "Create URL Hash")
+   */
+  readonly descriptiveName: string;
+}
+
+/**
+ * Configuration properties for Cloudwatch section about a DynamoDB table.
+ */
+export interface DynamoDBTableSectionProps extends BaseSectionProps {
+  readonly table: ddb.Table;
 }
 
 /**
@@ -77,68 +93,25 @@ export class ObservabilityHelper {
 
     this.dashboard.addWidgets(
       new TextWidget({
-        markdown: `# Function: ${props.functionNameDescription} 
+        markdown: `
+# Function: ${props.descriptiveName} 
 ${description}
-## Metadata
-- Function name: ${props.functionName}`,
+`,
         width: SIZE_FULL_WIDTH,
-        height: 3,
+        height: 2, // Increase this if you want to avoid vscrolls for long text
       })
     );
 
     //Widgets related to the Lambda function
     this.dashboard.addWidgets(
       new GraphWidget({
-        title: "AWS Function URL 4xx/5xx errors (sum)",
+        title: "AWS Function Invocations, Errors, and throttles",
         width: SIZE_HALF_WIDTH,
         left: [
-          new Metric({
-            namespace: "AWS/Lambda",
-            metricName: "Url5xxCount",
-            dimensionsMap: {
-              FunctionName: props.functionName,
-            },
-            statistic: "sum",
-            label: "Sum 5xx Errors",
-            period: STANDARD_RESOLUTION,
-          }),
-          new Metric({
-            namespace: "AWS/Lambda",
-            metricName: "Url4xxCount",
-            dimensionsMap: {
-              FunctionName: props.functionName,
-            },
-            statistic: "sum",
-            label: "Sum 4xx Errors",
-            period: STANDARD_RESOLUTION,
-          }),
+          props.function.metricErrors({ period: STANDARD_RESOLUTION }),
+          props.function.metricInvocations({ period: STANDARD_RESOLUTION }),
         ],
-      }),
-      new GraphWidget({
-        title: "AWS Function Invocations and Errors (sum)",
-        width: SIZE_HALF_WIDTH,
-        left: [
-          new Metric({
-            namespace: "AWS/Lambda",
-            metricName: "Invocations",
-            dimensionsMap: {
-              FunctionName: props.functionName,
-            },
-            statistic: "sum",
-            label: "Invocations (sum)",
-            period: STANDARD_RESOLUTION,
-          }),
-          new Metric({
-            namespace: "AWS/Lambda",
-            metricName: "Errors",
-            dimensionsMap: {
-              FunctionName: props.functionName,
-            },
-            statistic: "sum",
-            label: "Errors (sum)",
-            period: STANDARD_RESOLUTION,
-          }),
-        ],
+        right: [props.function.metricThrottles({ period: STANDARD_RESOLUTION })],
       }),
       new GraphWidget({
         title: "AWS Function URL Request Duration and Latency (p99)",
@@ -148,22 +121,13 @@ ${description}
             namespace: "AWS/Lambda",
             metricName: "UrlRequestLatency",
             dimensionsMap: {
-              FunctionName: props.functionName,
+              FunctionName: props.function.functionName,
             },
             statistic: "p99",
             label: "p99 Latency",
             period: STANDARD_RESOLUTION,
           }),
-          new Metric({
-            namespace: "AWS/Lambda",
-            metricName: "Duration",
-            dimensionsMap: {
-              FunctionName: props.functionName,
-            },
-            statistic: "p99",
-            label: "p99 Duration",
-            period: STANDARD_RESOLUTION,
-          }),
+          props.function.metricDuration(),
         ],
       }),
       new cloudwatch.GraphWidget({
@@ -174,12 +138,42 @@ ${description}
             namespace: "AWS/Lambda",
             metricName: "ConcurrentExecutions",
             dimensionsMap: {
-              FunctionName: props.functionName,
+              FunctionName: props.function.functionName,
             },
             statistic: "max",
             label: "Max",
             period: STANDARD_RESOLUTION,
           }),
+        ],
+      })
+    );
+  }
+
+  public createDynamoDBTableSection(props: DynamoDBTableSectionProps): void {
+    const description = props.description || "Performance monitors for this DynamoDB table.";
+
+    this.dashboard.addWidgets(
+      new TextWidget({
+        markdown: `
+# Table: ${props.descriptiveName} 
+${description}
+
+## Metadata
+* Table name: ${props.table.tableName}
+* Table ARN: ${props.table.tableArn}
+`,
+        width: SIZE_FULL_WIDTH,
+        height: 4, // Increase this if you want to avoid vscrolls for long text
+      })
+    );
+
+    this.dashboard.addWidgets(
+      new GraphWidget({
+        title: "DynamoDB Table consumed WCU/RCU",
+        width: SIZE_FULL_WIDTH,
+        left: [
+          props.table.metricConsumedReadCapacityUnits({ period: STANDARD_RESOLUTION }),
+          props.table.metricConsumedWriteCapacityUnits({ period: STANDARD_RESOLUTION }),
         ],
       })
     );
