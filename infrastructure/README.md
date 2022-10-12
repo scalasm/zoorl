@@ -1,4 +1,4 @@
-# Zoorl AWS infrastructure 
+# Zoorl AWS infrastructure
 
 This is the CDK app for the Zoorl infrastructure. It contains the definition for the networking, security,
 DynamoDB tables, and function definitions.
