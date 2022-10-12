@@ -116,13 +116,13 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
     const observabilityHelper = new ObservabilityHelper(dashboard);
 
     observabilityHelper.createLambdaFunctionSection({
-      functionName: this.createUrlHashFunction.functionName,
-      functionNameDescription: "Create URL Hash",
+      function: this.createUrlHashFunction,
+      descriptiveName: "Create URL Hash",
     });
 
     observabilityHelper.createLambdaFunctionSection({
-      functionName: this.readUrlHashFunction.functionName,
-      functionNameDescription: "Read URL Hash",
+      function: this.readUrlHashFunction,
+      descriptiveName: "Read URL Hash",
     });
   }
 
@@ -193,7 +193,6 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
       index: "zoorl/adapters/read_url_hash_handler.py",
     });
     this.urlHashesTable.grantReadData(readUrlHashFunction);
-
     const http404NotFoundResponseModel = props.restApi.addModel(
       "Http404ResponseModel",
       jsonSchema({
