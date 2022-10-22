@@ -51,7 +51,7 @@ interface DefaultLambdaSettings {
 
 interface ResponseModels {
   readonly urlHashResponseModel: apigateway.Model;
-  readonly http404NotFoundResponseModel: apigateway.Model;  
+  readonly http404NotFoundResponseModel: apigateway.Model;
 }
 
 /**
@@ -74,7 +74,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
   private readonly createUrlHashFunction: lambda.IFunction;
   private readonly readUrlHashFunction: lambda.IFunction;
   private readonly redirectToUrlFunction: lambda.IFunction;
-  
+
   private readonly responseModels: ResponseModels;
 
   constructor(scope: constructs.Construct, id: string, props: CoreMicroserviceStackProps) {
@@ -125,7 +125,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
 
     this.redirectToUrlFunction = this.bindRedirectToUrlFunction(props);
   }
-  
+
   public contributeWidgets(dashboard: cloudwatch.Dashboard): void {
     const observabilityHelper = new ObservabilityHelper(dashboard);
 
@@ -150,7 +150,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
     });
   }
 
-  private initializeSharedResponseModels(props: CoreMicroserviceStackProps) : ResponseModels {
+  private initializeSharedResponseModels(props: CoreMicroserviceStackProps): ResponseModels {
     const urlHashResponseModel = props.restApi.addModel(
       "UrlHashResponseModel",
       jsonSchema({
@@ -176,9 +176,9 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
     );
 
     return {
-      urlHashResponseModel, 
-      http404NotFoundResponseModel
-    }
+      urlHashResponseModel,
+      http404NotFoundResponseModel,
+    };
   }
 
   private bindCreateUrlHashFunction(props: CoreMicroserviceStackProps): lambda.Function {

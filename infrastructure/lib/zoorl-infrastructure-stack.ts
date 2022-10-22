@@ -50,7 +50,7 @@ export class ZoorlInfrastructureStack extends cdk.Stack {
 
     const observabilityStack = new ObservabilityStack(this, "observability", {
       stage: props.stage,
-      restApi: restApi
+      restApi: restApi,
     });
     observabilityStack.hookDashboardContributions(observableStacks);
   }
