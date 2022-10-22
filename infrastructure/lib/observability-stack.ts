@@ -5,11 +5,7 @@
 import { Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { Dashboard, TextWidget, GraphWidget } from "aws-cdk-lib/aws-cloudwatch";
-import {
-  IObservabilityContributor,
-  STANDARD_RESOLUTION,
-  SIZE_FULL_WIDTH,
-} from "./shared/common-observability";
+import { IObservabilityContributor, STANDARD_RESOLUTION, SIZE_FULL_WIDTH } from "./shared/common-observability";
 
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 
