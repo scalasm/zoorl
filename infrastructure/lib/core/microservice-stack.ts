@@ -261,7 +261,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
     return readUrlHashFunction;
   }
 
-  private bindRedirectToUrlFunction(_: CoreMicroserviceStackProps): lambda.Function {
+  private bindRedirectToUrlFunction(props: CoreMicroserviceStackProps): lambda.Function {
     const readUrlHashFunction = new pylambda.PythonFunction(this, "redirect-to-url-hash-function", {
       ...this.defaultFunctionSettings,
       index: "zoorl/adapters/redirect_handler.py",
