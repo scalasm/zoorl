@@ -1,33 +1,19 @@
 """AWS Lambda adapter for executing the use case for creating a new URL hash."""
 
 from typing import Any
-import boto3  
-import os
 
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.logging import correlation_paths
 
-from zoorl.adapters.dynamodb_model import DynamoDBUrlHashRepository
+from zoorl.adapters.lambda_support import app, tracer, logger, url_hash_repository
 
 from zoorl.core.usecases.create_url_hash import (
     CreateUrlHashUseCaseRequest,
     CreateUrlHashUseCase
 )
 
-tracer = Tracer()
-logger = Logger()
-app = APIGatewayRestResolver()
-
-dynamodb = boto3.resource("dynamodb")
-
 usecase = CreateUrlHashUseCase(
-    url_hash_repository=DynamoDBUrlHashRepository(
-        dynamodb.Table(
-            os.getenv("URL_HASHES_TABLE")
-        )
-    )
+    url_hash_repository=url_hash_repository
 )
 
 @app.post("/u")
