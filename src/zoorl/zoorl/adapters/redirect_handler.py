@@ -1,33 +1,45 @@
 """AWS Lambda adapter for implementing the redirection use case.
 
-This adapter will invoke the use case, and format the HTTP response to instruct
-the client web browser to perform redirection to the mapped site.
+This adapter will invoke the use case for reading the URL hash 
+and will perform HTTP 301 redirect by setting the  location header
+in the reponse.
+
+This will trigger the client web browser to perform redirection 
+to the mapped site.
 """
 
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes.api_gateway_authorizer_event import APIGatewayAuthorizerRequestEvent
+from aws_lambda_powertools.event_handler import (
+    Response, 
+    content_types
+)
 from aws_lambda_powertools.logging import correlation_paths
 
 from zoorl.core.usecases.read_url_hash import (
     ReadUrlHashUseCase,
     ReadUrlHashUseCaseRequest
 )
+from zoorl.adapters import http_response_codes
 from zoorl.adapters.lambda_support import app, tracer, logger, url_hash_repository
 
 usecase = ReadUrlHashUseCase(
     url_hash_repository=url_hash_repository
 )
 
-@app.get("/u/<url_hash>")
+@app.get("/r/<url_hash>")
 @tracer.capture_method
-def handle(url_hash: str) -> dict:
-    """Returns the URL Hash data for the specified resource.
+def handle_redirect(url_hash: str) -> Response:
+    """Returns the HTTP 301 response that will trigger redirection.
+    
+    On receiving an HTTP 301 response and 'Location' header, we trigger the 
+    client web browser to perform redirection to the specified page.
     
     Arguments:
         url_hash: the desired URL hash
 
     Returns:
-        the URL hash information.   
+        The configured HTTP 301 Permanently Moved 'Response' object object    
     
     Raises:
         UrlHashNotFoundError: if the hash was not found
@@ -39,12 +51,14 @@ def handle(url_hash: str) -> dict:
 
     logger.info(f"Got response for hash \"{url_hash}\": {response.url} .")
 
-    return {
-        "url_hash": response.url_hash,
-        "url": response.url,
-        "ttl": response.ttl
-    }
-
+    return Response(
+        status_code = http_response_codes.MOVED_PERMANENTLY,
+        headers = {
+            "Location": response.url
+        },
+        content_type = content_types.TEXT_HTML, # We always redirect to another HTML page
+        body = None # there is no body, but the argument is mandatory
+    )
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
