@@ -3,32 +3,19 @@ import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 
-import { ZoorlInfrastructureStack } from "../lib/zoorl-infrastructure-stack";
+import { ZoorlApplicationStack } from "../lib/zoorl-application-stack";
 import { ZoorlPipelineStack } from "../lib/cicd/pipeline-stack";
 
-// import { AddPermissionsBoundaryToRoles } from "../lib/permission-boundary";
-
 const app = new cdk.App();
-new ZoorlInfrastructureStack(app, "ZoorlInfrastructureStack", {
-  stage: "dev",
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
 
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
-
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
-
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+// This is an application stack for personal development - it is separated from 
+// the other staged stacks that will be handled by the pipeline.
+new ZoorlApplicationStack(app, "ZoorlPersonalStack", {
+  stage: "personal",
 });
 
-const pipelineStack = new ZoorlPipelineStack(app, "ZoorPipelineStack", {
-  // Nothing for now
-});
+// CI/CD pipeline stack
+const pipelineStack = new ZoorlPipelineStack(app, "ZoorlPipelineStack");
 
 // The permission boudary leverages the one defined at the bootstrap of the environments
 // This is from:
