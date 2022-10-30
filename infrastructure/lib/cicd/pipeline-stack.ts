@@ -17,21 +17,28 @@ export class ZoorlPipelineStack extends cdk.Stack {
     const branch = "7-create-cicd-pipeline";
     const gitHubUsernameRepository = "scalasm/zoorl";
 
-    const pipeline = new pipelines.CodePipeline(this, "Pipeline", {
-      pipelineName: "MyCDKPipeline",
-      synth: new pipelines.CodeBuildStep("SynthStep", {
-        input: pipelines.CodePipelineSource.gitHub(gitHubUsernameRepository, branch, {
-          authentication: cdk.SecretValue.secretsManager("GITHUB_TOKEN"),
-        }),
-        installCommands: ["npm install -g aws-cdk"],
-        commands: [
-            "cd infrastructure/", 
-            "npm ci", 
-            "npm run build", 
-            "npx cdk synth"
-        ],
+    const synthStep =  new pipelines.CodeBuildStep("SynthStep", {
+      input: pipelines.CodePipelineSource.gitHub(gitHubUsernameRepository, branch, {
+        authentication: cdk.SecretValue.secretsManager("GITHUB_TOKEN"),
       }),
+      installCommands: ["npm install -g aws-cdk"],
+      commands: [
+          "cd infrastructure/", 
+          "npm ci", 
+          "npm run build", 
+          "cdk synth"
+      ],
     });
-    // Pipeline code goes here
+
+    const pipelineName = "zoorl-pipeline";
+
+    const pipeline = new pipelines.CodePipeline(this, "Pipeline", {
+      pipelineName: pipelineName,
+      // We deploy to multiple accounts and they need to share the encryption key for the artifacts bucket
+      crossAccountKeys: true,
+      synth: synthStep,
+      // We use docker to build our Lambda functions
+      dockerEnabledForSynth: true,
+    });
   }
 }
