@@ -21,18 +21,20 @@ export class ZoorlPipelineStack extends cdk.Stack {
     const githubSettings = this.node.tryGetContext("github");
 
     const branch = githubSettings["repo_branch"] as string;
-    const gitHubUsernameRepository = `${githubSettings["alias"]}/githubSettings["repo_name"]`;
+    const gitHubUsernameRepository = `${githubSettings["alias"]}/${githubSettings["repo_name"]}`;
 
-    const synthStep =  new pipelines.CodeBuildStep("SynthStep", {
+    const synthStep = new pipelines.CodeBuildStep("SynthStep", {
       input: pipelines.CodePipelineSource.gitHub(gitHubUsernameRepository, branch, {
         authentication: cdk.SecretValue.secretsManager("GITHUB_TOKEN"),
       }),
-      installCommands: ["npm install -g aws-cdk"],
+      installCommands: [
+        "npm install -g aws-cdk"
+      ],
       commands: [
-          "cd infrastructure/", 
-          "npm ci", 
-          "npm run build", 
-          "cdk synth"
+        "cd infrastructure/",
+        "npm ci",
+        "npm run build",
+        "cdk synth"
       ],
     });
 
@@ -49,30 +51,33 @@ export class ZoorlPipelineStack extends cdk.Stack {
         // This pipeline will need to enumerate the accounts in the organization in order to synthesize the deployment stages.
         rolePolicy: [
           new iam.PolicyStatement({
-              actions: [
-                  "organizations:ListAccounts",
-                  "organizations:ListTagsForResource"
-              ],
-              resources: ["*"],
-          })
-        ]
-      }
+            actions: [
+              "organizations:ListAccounts", 
+              "organizations:ListTagsForResource"
+            ],
+            resources: ["*"],
+          }),
+        ],
+      },
     });
 
-
-//     new OrganizationsHelper()
-//       .forEachStage((stageDetails) => {
-//         pipeline.addStage(
-//           new ApplicationStage(this, stageDetails.name, {env: {account: stageDetails.accountId}}), {
-//           pre: [
-// //            customactions.pythonUnitTestsAction(synthStep)
-//           ]
-//         });
-// //        customactions.acceptanceTestsAction(pipeline, applicationStage, lambdaArtifact)
-//     });
+    //     new OrganizationsHelper()
+    //       .forEachStage((stageDetails) => {
+    //         pipeline.addStage(
+    //           new ApplicationStage(this, stageDetails.name, {env: {account: stageDetails.accountId}}), {
+    //           pre: [
+    // //            customactions.pythonUnitTestsAction(synthStep)
+    //           ]
+    //         });
+    // //        customactions.acceptanceTestsAction(pipeline, applicationStage, lambdaArtifact)
+    //     });
 
     new cdk.CfnOutput(this, "PipelineConsoleUrl", {
-      value: `https://${cdk.Stack.of(this).region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${pipelineName}/view?region=${cdk.Stack.of(this).region}`,
+      value: `https://${
+        cdk.Stack.of(this).region
+      }.console.aws.amazon.com/codesuite/codepipeline/pipelines/${pipelineName}/view?region=${
+        cdk.Stack.of(this).region
+      }`,
     });
   }
 }
