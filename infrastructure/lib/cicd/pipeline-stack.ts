@@ -61,16 +61,23 @@ export class ZoorlPipelineStack extends cdk.Stack {
       },
     });
 
-    //     new OrganizationsHelper()
-    //       .forEachStage((stageDetails) => {
-    //         pipeline.addStage(
-    //           new ApplicationStage(this, stageDetails.name, {env: {account: stageDetails.accountId}}), {
-    //           pre: [
-    // //            customactions.pythonUnitTestsAction(synthStep)
-    //           ]
-    //         });
-    // //        customactions.acceptanceTestsAction(pipeline, applicationStage, lambdaArtifact)
-    //     });
+    new OrganizationsHelper()
+      .forEachStage((stageDetails) => {
+        pipeline.addStage(
+          new ApplicationStage(this, stageDetails.name, {
+            stageName: stageDetails.name,
+            env: {
+              account: stageDetails.accountId
+            }
+          }), 
+          {
+            pre: [
+//            customactions.pythonUnitTestsAction(synthStep)
+            ]
+          }
+        );
+//        customactions.acceptanceTestsAction(pipeline, applicationStage, lambdaArtifact)
+    });
 
     new cdk.CfnOutput(this, "PipelineConsoleUrl", {
       value: `https://${

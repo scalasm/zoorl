@@ -6,6 +6,9 @@ import * as cdk from "aws-cdk-lib";
 import { ZoorlApplicationStack } from "../zoorl-application-stack";
 import { Construct } from "constructs";
 
+export interface ApplicationStageProps extends cdk.StageProps {
+}
+
 /**
  * Deployable unit collecting all required stacks for our application (e.g., frontend and backend in dev/prod environments).
  */
@@ -17,11 +20,11 @@ export class ApplicationStage extends cdk.Stage {
   public readonly identityPoolIdOutput: cdk.CfnOutput;
   public readonly regionOutput: cdk.CfnOutput;
 
-  constructor(scope: Construct, id: string, props?: cdk.StageProps) {
+  constructor(scope: Construct, id: string, props: ApplicationStageProps) {
     super(scope, id, props);
 
     const applicationStack = new ZoorlApplicationStack(this, "application-stack", {
-      stage: "dev",
+      stage: props.stageName!,
     });
 
     // Expose application details for this stage: API URL and auth
