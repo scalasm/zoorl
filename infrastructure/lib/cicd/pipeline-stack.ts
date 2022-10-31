@@ -34,6 +34,7 @@ export class ZoorlPipelineStack extends cdk.Stack {
         "cd infrastructure/",
         "npm ci",
         "npm run build",
+        "npm --version",
         "cdk synth ZoorlPipelineStack"
       ],
     });
