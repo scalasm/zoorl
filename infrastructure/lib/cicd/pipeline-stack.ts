@@ -65,6 +65,15 @@ export class ZoorlPipelineStack extends cdk.Stack {
 
     new OrganizationsHelper()
       .forEachStage((stageDetails) => {
+
+        const preSteps = [];
+
+        if (stageDetails.name === "production") {
+          preSteps.push(
+            new pipelines.ManualApprovalStep("PromoteToProd")
+          );
+        }
+
         pipeline.addStage(
           new ApplicationStage(this, stageDetails.name, {
             stageName: stageDetails.name,
@@ -73,12 +82,9 @@ export class ZoorlPipelineStack extends cdk.Stack {
             }
           }), 
           {
-            pre: [
-//            customactions.pythonUnitTestsAction(synthStep)
-            ]
+            pre: preSteps,
           }
         );
-//        customactions.acceptanceTestsAction(pipeline, applicationStage, lambdaArtifact)
     });
 
     new cdk.CfnOutput(this, "PipelineConsoleUrl", {
