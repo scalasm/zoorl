@@ -3,8 +3,12 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import * as cdk from "aws-cdk-lib";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as pipelines from "aws-cdk-lib/pipelines";
 import { Construct } from "constructs";
+
+import { ApplicationStage } from "./application-stage";
+import { OrganizationsHelper } from "./pipeline-helpers";
 
 /**
  * CI/CD pipeline.
@@ -14,8 +18,10 @@ export class ZoorlPipelineStack extends cdk.Stack {
     super(scope, id, props);
 
     // Set your Github username and repository name
-    const branch = "7-create-cicd-pipeline";
-    const gitHubUsernameRepository = "scalasm/zoorl";
+    const githubSettings = this.node.tryGetContext("github");
+
+    const branch = githubSettings["repo_branch"] as string;
+    const gitHubUsernameRepository = `${githubSettings["alias"]}/githubSettings["repo_name"]`;
 
     const synthStep =  new pipelines.CodeBuildStep("SynthStep", {
       input: pipelines.CodePipelineSource.gitHub(gitHubUsernameRepository, branch, {
@@ -39,6 +45,34 @@ export class ZoorlPipelineStack extends cdk.Stack {
       synth: synthStep,
       // We use docker to build our Lambda functions
       dockerEnabledForSynth: true,
+      synthCodeBuildDefaults: {
+        // This pipeline will need to enumerate the accounts in the organization in order to synthesize the deployment stages.
+        rolePolicy: [
+          new iam.PolicyStatement({
+              actions: [
+                  "organizations:ListAccounts",
+                  "organizations:ListTagsForResource"
+              ],
+              resources: ["*"],
+          })
+        ]
+      }
+    });
+
+
+//     new OrganizationsHelper()
+//       .forEachStage((stageDetails) => {
+//         pipeline.addStage(
+//           new ApplicationStage(this, stageDetails.name, {env: {account: stageDetails.accountId}}), {
+//           pre: [
+// //            customactions.pythonUnitTestsAction(synthStep)
+//           ]
+//         });
+// //        customactions.acceptanceTestsAction(pipeline, applicationStage, lambdaArtifact)
+//     });
+
+    new cdk.CfnOutput(this, "PipelineConsoleUrl", {
+      value: `https://${cdk.Stack.of(this).region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${pipelineName}/view?region=${cdk.Stack.of(this).region}`,
     });
   }
 }
