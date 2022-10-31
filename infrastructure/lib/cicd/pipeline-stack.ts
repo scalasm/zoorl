@@ -37,6 +37,7 @@ export class ZoorlPipelineStack extends cdk.Stack {
         "npm --version",
         "cdk synth ZoorlPipelineStack"
       ],
+      primaryOutputDirectory: "infrastructure/cdk.out"
     });
 
     const pipelineName = "zoorl-pipeline";
