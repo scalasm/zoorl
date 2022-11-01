@@ -70,7 +70,9 @@ export class ZoorlPipelineStack extends cdk.Stack {
 
         if (stageDetails.name === "production") {
           preSteps.push(
-            new pipelines.ManualApprovalStep("PromoteToProd")
+            new pipelines.ManualApprovalStep("PromoteToProd", {
+              comment: "Approve change(s) for promotion into production environment."
+            })
           );
         }
 
