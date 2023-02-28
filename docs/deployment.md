@@ -25,3 +25,17 @@ npm run cdk:deploy -- ZoorlPipelineStack --profile cicd
 
 The pipeline is configured to listed to changes on the `main` branch of 
 the GitHub repository (you can edit the cdk.json file, if needed).
+
+# F.A.Q.
+
+## Error when deploying/destroying the CI/CD pipeline 
+
+If you get something like `Token expired, run "aws sso login --profile cicd && npx cdk-sso-sync cicd"` then 
+see How to use AWS CDK with AWS SSO & Profiles](https://www.matscloud.com/blog/2020/06/25/how-to-use-aws-cdk-with-aws-sso-profiles/).
+
+A convenience tweaked script is provided in this directory and here is how to use it:
+```
+aws sso login –-profile cicd
+python3 docs/aws_sso.py cicd
+cdk deploy --profile cicd PipelineStack
+```
