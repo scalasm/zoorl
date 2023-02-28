@@ -36,7 +36,7 @@
     "github": {
       "alias": "scalasm",
       "repo_name": "zoorl",
-      "repo_branch": "7-create-cicd-pipeline"
+      "repo_branch": "main"
     }
   }
 }
