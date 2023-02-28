@@ -13,7 +13,7 @@ import { ObservabilityStack } from "./observability-stack";
 /**
  * Configuration properties for ZoorlInfrastructureStack instances.
  */
-export interface ZoorlInfrastructureStackProps extends cdk.StackProps {
+export interface ZoorlApplicationStackProps extends cdk.StackProps {
   /**
    * Stage name for the stack (e.g., "dev", "prod", ...)
    */
@@ -27,8 +27,8 @@ export interface ZoorlInfrastructureStackProps extends cdk.StackProps {
  *  - REST API on AWS API Gateway
  *  - Core microservice exposed as resource ("/u") on the REST API
  */
-export class ZoorlInfrastructureStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: ZoorlInfrastructureStackProps) {
+export class ZoorlApplicationStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: ZoorlApplicationStackProps) {
     super(scope, id, props);
 
     const networkStack = new NetworkStack(this, "network");

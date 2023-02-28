@@ -2,7 +2,7 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
-import { Stack, StackProps } from "aws-cdk-lib";
+import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { Dashboard, TextWidget, GraphWidget } from "aws-cdk-lib/aws-cloudwatch";
 import { IObservabilityContributor, STANDARD_RESOLUTION, SIZE_FULL_WIDTH } from "./shared/common-observability";
@@ -12,7 +12,7 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 /**
  * Configuration properties for the observability stack.
  */
-interface ObservabilityStackProps extends StackProps {
+interface ObservabilityStackProps extends cdk.NestedStackProps {
   readonly stage: string;
 
   readonly restApi: apigateway.RestApi;
@@ -21,7 +21,7 @@ interface ObservabilityStackProps extends StackProps {
 /**
  * Dashboard and metrics stack.
  */
-export class ObservabilityStack extends Stack {
+export class ObservabilityStack extends cdk.NestedStack {
   private readonly dashboard: Dashboard;
 
   constructor(scope: Construct, id: string, props: ObservabilityStackProps) {
