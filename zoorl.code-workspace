@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "src/zoorl"
+		},
+		{
+			"path": "infrastructure"
+		}
+	],
+	"settings": {}
+}
