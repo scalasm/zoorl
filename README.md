@@ -10,7 +10,7 @@
 I created this project as **a case study for learning about different AWS technologies and Python**: something simple, yet challenging for me :)
 
 # Additional documentation
-- [infrastructure](infrastructure/README.md) - this is the CDK App containaing multiple stacks for deploying the Zoor application resources:
+- [infrastructure](infrastructure/README.md) - this is the CDK App containaing multiple stacks for deploying the Zoorl application resources:
   - `personal application stack` (this is a developer-specific stack useful for "local" testing)
   - `CI/CD pipeline stack` (the pipeline that will deploy the application stack in stages)
 - [src/zoorl](src/zoorl/README.md) - is the implementation of the lambda functions in Python 3.9
