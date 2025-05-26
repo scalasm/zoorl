@@ -14,14 +14,14 @@ new ZoorlApplicationStack(app, "ZoorlPersonalStack", {
   stage: "personal",
 });
 
-// CI/CD pipeline stack
-const pipelineStack = new ZoorlPipelineStack(app, "ZoorlPipelineStack");
+// // CI/CD pipeline stack
+// const pipelineStack = new ZoorlPipelineStack(app, "ZoorlPipelineStack");
 
-// The permission boudary leverages the one defined at the bootstrap of the environments
-// This is from:
-// * the AWS Activate Workshop (https://catalog.us-east-1.prod.workshops.aws/workshops/13304db2-f715-48bf-ada0-92e5c4eea945/en-US/040-cicd/20-add-pipeline)
-// * Adapted from https://stackoverflow.com/a/72743464
-const permissionBoundaryArn = cdk.Fn.importValue("CICDPipelinePermissionsBoundaryArn");
+// // The permission boudary leverages the one defined at the bootstrap of the environments
+// // This is from:
+// // * the AWS Activate Workshop (https://catalog.us-east-1.prod.workshops.aws/workshops/13304db2-f715-48bf-ada0-92e5c4eea945/en-US/040-cicd/20-add-pipeline)
+// // * Adapted from https://stackoverflow.com/a/72743464
+// const permissionBoundaryArn = cdk.Fn.importValue("CICDPipelinePermissionsBoundaryArn");
 
-const boundary = iam.ManagedPolicy.fromManagedPolicyArn(pipelineStack, "Boundary", permissionBoundaryArn);
-iam.PermissionsBoundary.of(pipelineStack).apply(boundary);
+// const boundary = iam.ManagedPolicy.fromManagedPolicyArn(pipelineStack, "Boundary", permissionBoundaryArn);
+// iam.PermissionsBoundary.of(pipelineStack).apply(boundary);
