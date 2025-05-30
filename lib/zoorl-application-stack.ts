@@ -7,7 +7,7 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { Construct } from "constructs";
 import { NetworkStack } from "./network-stack";
 import { AuthStack } from "./auth-stack";
-import { CoreMicroserviceStack } from "./core/microservice-stack";
+import { StatelessStack } from "./core/microservice-stack";
 import { ObservabilityStack } from "./observability-stack";
 
 /**
@@ -41,7 +41,7 @@ export class ZoorlApplicationStack extends cdk.Stack {
     });
 
     const observableStacks = [
-      new CoreMicroserviceStack(this, "core-microservice", {
+      new StatelessStack(this, "core-microservice", {
         vpc: networkStack.vpc,
         restApi: restApi,
         authorizer: restApiAuthorizer,

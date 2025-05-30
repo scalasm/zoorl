@@ -2,12 +2,15 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
+import * as fs from "fs";
+import * as path from 'path';
+
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as cdk from "aws-cdk-lib";
 import * as constructs from "constructs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as pylambda from "@aws-cdk/aws-lambda-python-alpha";
+import * as lambda_nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as ddb from "aws-cdk-lib/aws-dynamodb";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 
@@ -17,7 +20,7 @@ import { IObservabilityContributor, ObservabilityHelper } from "../shared/common
 /**
  * Configuration properties for the CoreMicroserviceStack.
  */
-export interface CoreMicroserviceStackProps extends cdk.NestedStackProps {
+export interface StatelessStackProps extends cdk.NestedStackProps {
   /**
    * Target VPC where lambda functions and other resources will be created.
    */
@@ -33,26 +36,13 @@ export interface CoreMicroserviceStackProps extends cdk.NestedStackProps {
   readonly authorizer: apigateway.Authorizer;
 }
 
-/**
- * (internal) Typed interface for the shared settings for the lambda functions we use in this microservice.
- */
-interface DefaultLambdaSettings {
-  vpc: cdk.aws_ec2.IVpc;
-  vpcSubnets: {
-    subnetType: cdk.aws_ec2.SubnetType;
-  };
-  runtime: cdk.aws_lambda.Runtime;
-  entry: string;
-  handler: string;
-  environment: { [key: string]: string };
-  // Functions are pretty quick, so this is quite conservative
-  timeout: cdk.Duration;
-}
-
-interface ResponseModels {
-  readonly urlHashResponseModel: apigateway.Model;
+interface CommonResponseModels {
+  readonly readUrlHashResponseModel: apigateway.Model;
   readonly http404NotFoundResponseModel: apigateway.Model;
 }
+
+// Define a constant for the adapters/primary directory
+const PRIMARY_ADAPTERS = "../../src/adapters/primary";
 
 /**
  * Core Zoorl logic for managing the creation of URL hashes and their retrieval through
@@ -63,22 +53,26 @@ interface ResponseModels {
  *  * GET /u/{hash} - Lookup a URL hash and, if found, returns an HTTP 301 Permanently Moved
  *    to trigger browser redirection.
  */
-export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabilityContributor {
+export class StatelessStack extends cdk.NestedStack implements IObservabilityContributor {
   private readonly urlHashesTable: ddb.Table;
 
   private readonly urlHashesResource: apigateway.Resource;
   private readonly redirectResource: apigateway.Resource;
 
-  private readonly defaultFunctionSettings: DefaultLambdaSettings;
+  private readonly defaultFunctionSettings: any;
 
   private readonly createUrlHashFunction: lambda.IFunction;
   private readonly readUrlHashFunction: lambda.IFunction;
   private readonly redirectToUrlFunction: lambda.IFunction;
 
-  private readonly responseModels: ResponseModels;
+  private readonly commonResponseModels: CommonResponseModels;
+  
+  private readonly restApi: apigateway.RestApi;
 
-  constructor(scope: constructs.Construct, id: string, props: CoreMicroserviceStackProps) {
+  constructor(scope: constructs.Construct, id: string, props: StatelessStackProps) {
     super(scope, id, props);
+
+    this.restApi = props.restApi;
 
     this.urlHashesTable = new ddb.Table(this, "UrlHashesTable", {
       tableName: "UrlHashes",
@@ -95,26 +89,40 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const lambdaPowerToolsConfig = {
+      LOG_LEVEL: 'DEBUG',
+      POWERTOOLS_LOGGER_LOG_EVENT: 'true',
+      POWERTOOLS_LOGGER_SAMPLE_RATE: '1',
+      POWERTOOLS_TRACE_ENABLED: 'enabled',
+      POWERTOOLS_TRACER_CAPTURE_HTTPS_REQUESTS: 'captureHTTPsRequests',
+      POWERTOOLS_SERVICE_NAME: 'zoorl-service',
+      POWERTOOLS_TRACER_CAPTURE_RESPONSE: 'captureResult',
+      POWERTOOLS_METRICS_NAMESPACE: 'zoorl',
+    };
+
     // All lambda functions are Python 3.9-based and will be hosted in in private subnets inside target VPC.
     this.defaultFunctionSettings = {
       vpc: props.vpc,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
       },
-      runtime: lambda.Runtime.PYTHON_3_12,
-      entry: "../src/zoorl/",
-      handler: "handle",
-      environment: {
-        URL_HASHES_TABLE: this.urlHashesTable.tableName,
-        POWERTOOLS_SERVICE_NAME: "zoorl",
-        POWERTOOLS_LOGGER_LOG_EVENT: "true",
-        LOG_LEVEL: "INFO",
-      },
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 256,
       // Functions are pretty quick, so this is quite conservative
       timeout: cdk.Duration.seconds(5),
+      tracing: lambda.Tracing.ACTIVE,
+      handler: 'handler',
+      bundling: {
+        minify: true,
+        externalModules: ['aws-sdk'],
+      },
+      environment: {
+        ...lambdaPowerToolsConfig,
+        URL_HASHES_TABLE: this.urlHashesTable.tableName
+      }
     };
 
-    this.responseModels = this.initializeSharedResponseModels(props);
+    this.commonResponseModels = this.initializeSharedResponseModels(props);
 
     this.urlHashesResource = props.restApi.root.addResource("u");
     this.redirectResource = props.restApi.root.addResource("r");
@@ -150,20 +158,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
     });
   }
 
-  private initializeSharedResponseModels(props: CoreMicroserviceStackProps): ResponseModels {
-    const urlHashResponseModel = props.restApi.addModel(
-      "UrlHashResponseModel",
-      jsonSchema({
-        modelName: "UrlHashResponseModel",
-        properties: {
-          url_hash: { type: apigateway.JsonSchemaType.STRING },
-          url: { type: apigateway.JsonSchemaType.STRING },
-          ttl: { type: apigateway.JsonSchemaType.INTEGER },
-        },
-        requiredProperties: ["url_hash", "url", "ttl"],
-      })
-    );
-
+  private initializeSharedResponseModels(props: StatelessStackProps): CommonResponseModels {
     const http404NotFoundResponseModel = props.restApi.addModel(
       "Http404ResponseModel",
       jsonSchema({
@@ -175,31 +170,25 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
       })
     );
 
+    const readUrlHashResponseModel = this.createModelFromJsonSchemaFile(`${PRIMARY_ADAPTERS}/read-url-hash.response.schema.json`, "ReadUrlHashResponse")
+
     return {
-      urlHashResponseModel,
-      http404NotFoundResponseModel,
+      readUrlHashResponseModel,
+      http404NotFoundResponseModel
     };
   }
 
-  private bindCreateUrlHashFunction(props: CoreMicroserviceStackProps): lambda.Function {
-    const createUrlHashFunction = new pylambda.PythonFunction(this, "create-url-hash-function", {
+  private bindCreateUrlHashFunction(props: StatelessStackProps): lambda.Function {
+    const createUrlHashFunction = new lambda_nodejs.NodejsFunction(this, 'hello-world-function', {
       ...this.defaultFunctionSettings,
-      index: "zoorl/adapters/create_url_hash_handler.py",
+      POWERTOOLS_SERVICE_NAME: 'CrateUrlHashFunction',
+      handler: 'handler',
+      entry: path.join(__dirname, `${PRIMARY_ADAPTERS}/create-url-hash.adapter.ts`),
     });
     this.urlHashesTable.grantWriteData(createUrlHashFunction);
 
     // POST /u
-    const requestModel = props.restApi.addModel(
-      "CreateUrlHashRequestModel",
-      jsonSchema({
-        modelName: "CreateUrlHashRequestModel",
-        properties: {
-          url: { type: apigateway.JsonSchemaType.STRING },
-          ttl: { type: apigateway.JsonSchemaType.INTEGER },
-        },
-        requiredProperties: ["url"],
-      })
-    );
+    const requestModel = this.createModelFromJsonSchemaFile(`${PRIMARY_ADAPTERS}/create-url-hash.request.schema.json`, "CreateUrlHashRequest");
 
     const requestValidator = new apigateway.RequestValidator(this, "ZoorlRequestValidator", {
       restApi: props.restApi,
@@ -220,7 +209,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
         {
           statusCode: "200",
           responseModels: {
-            "application/json": this.responseModels.urlHashResponseModel,
+            "application/json": this.commonResponseModels.readUrlHashResponseModel,
           },
         },
       ],
@@ -229,11 +218,14 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
     return createUrlHashFunction;
   }
 
-  private bindReadUrlHashFunction(props: CoreMicroserviceStackProps): lambda.Function {
-    const readUrlHashFunction = new pylambda.PythonFunction(this, "read-url-hash-function", {
+  private bindReadUrlHashFunction(props: StatelessStackProps): lambda.Function {
+    const readUrlHashFunction = new lambda_nodejs.NodejsFunction(this, 'read-url-by-hash-function', {
       ...this.defaultFunctionSettings,
-      index: "zoorl/adapters/read_url_hash_handler.py",
+      POWERTOOLS_SERVICE_NAME: 'ReadUrlByHash',
+      handler: 'handler',
+      entry: path.join(__dirname, `${PRIMARY_ADAPTERS}/redirect.adapter.ts`),
     });
+
     this.urlHashesTable.grantReadData(readUrlHashFunction);
 
     // GET /u/{url_hash}
@@ -246,13 +238,13 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
           {
             statusCode: "200",
             responseModels: {
-              "application/json": this.responseModels.urlHashResponseModel,
+              "application/json": this.commonResponseModels.readUrlHashResponseModel,
             },
           },
           {
             statusCode: "404",
             responseModels: {
-              "application/json": this.responseModels.http404NotFoundResponseModel,
+              "application/json": this.commonResponseModels.http404NotFoundResponseModel,
             },
           },
         ],
@@ -261,34 +253,84 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
     return readUrlHashFunction;
   }
 
-  private bindRedirectToUrlFunction(props: CoreMicroserviceStackProps): lambda.Function {
-    const readUrlHashFunction = new pylambda.PythonFunction(this, "redirect-to-url-hash-function", {
+  private bindRedirectToUrlFunction(props: StatelessStackProps): lambda.Function {
+    const redirectToUrlFunction = new lambda_nodejs.NodejsFunction(this, 'redirect-to-url-function', {
       ...this.defaultFunctionSettings,
-      index: "zoorl/adapters/redirect_handler.py",
+      POWERTOOLS_SERVICE_NAME: 'RedirectToUrl',
+      handler: 'handler',
+      entry: path.join(__dirname, `${PRIMARY_ADAPTERS}/redirect.adapter.ts`),
     });
-    this.urlHashesTable.grantReadData(readUrlHashFunction);
+
+    this.urlHashesTable.grantReadData(redirectToUrlFunction);
     // GET /r/{url_hash}
     this.redirectResource
       .addResource("{url_hash}")
-      .addMethod("GET", new apigateway.LambdaIntegration(readUrlHashFunction, { proxy: true }), {
+      .addMethod("GET", new apigateway.LambdaIntegration(redirectToUrlFunction, { proxy: true }), {
         authorizationType: apigateway.AuthorizationType.NONE,
 
         methodResponses: [
           {
             statusCode: "301",
-            responseModels: {
-              "application/json": this.responseModels.http404NotFoundResponseModel,
-            },
+            responseModels: {} // No response model needed for 301 redirect,
           },
           {
             statusCode: "404",
             responseModels: {
-              "application/json": this.responseModels.http404NotFoundResponseModel,
+              "application/json": this.commonResponseModels.http404NotFoundResponseModel,
             },
           },
         ],
       });
 
-    return readUrlHashFunction;
+    return redirectToUrlFunction;
+  }
+
+  private setUpRequestResponseModels(targetResource: apigateway.Resource, 
+    operationName: string, httpVerb: string, requestJsonSchemaPath: string, responseJsonSchemaPath: string,
+    integration: apigateway.Integration, methodOptions: apigateway.MethodOptions): any {
+    
+    const requestModel = this.createModelFromJsonSchemaFile(requestJsonSchemaPath, `${operationName}Request`);
+    const responseModel = this.createModelFromJsonSchemaFile(responseJsonSchemaPath, `${operationName}Response`);
+
+    const requestValidator = new apigateway.RequestValidator(this, `${operationName}RequestValidator`, {
+      restApi: this.restApi,
+      requestValidatorName: `Validate Payload and parameters for ${operationName}`,
+      validateRequestBody: true,
+      validateRequestParameters: true,
+    });
+
+    targetResource.addMethod(httpVerb, integration, {
+      ...methodOptions,
+
+      requestModels: {
+        "application/json": requestModel,
+      },
+      requestValidator: requestValidator,
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseModels: {
+            "application/json": responseModel,
+          },
+        },
+      ],
+    });
+  }
+
+  private createModelFromJsonSchemaFile(responseJsonSchemaPath: string, modelName: string) {
+    const responseSchema = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, responseJsonSchemaPath),
+        "utf8"
+      )
+    );
+    const responseModel = this.restApi.addModel(
+      `${modelName}Model`, {
+      modelName: `${modelName}Model`,
+      contentType: "application/json",
+      schema: responseSchema,
+    }
+    );
+    return responseModel;
   }
 }

@@ -3,7 +3,7 @@
 // import * as ZoorlInfrastructure from '../lib/zoorl-infrastructure-stack';
 
 // example test. To run these tests, uncomment this file along with the
-// example resource in lib/zoorl-infrastructure-stack.ts
+// example resource in lib/zoorl-application-stack.ts
 test("SQS Queue Created", () => {
   //   const app = new cdk.App();
   //     // WHEN

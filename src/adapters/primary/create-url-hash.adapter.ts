@@ -2,16 +2,23 @@
  * AWS Lambda adapter for executing the use case for creating a new URL hash
  */
 
-import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { Metrics, MetricUnit } from '@aws-lambda-powertools/metrics';
+import { logMetrics } from '@aws-lambda-powertools/metrics/middleware';
+import { Tracer } from '@aws-lambda-powertools/tracer';
+import { captureLambdaHandler } from '@aws-lambda-powertools/tracer/middleware';
+import { Logger } from '@aws-lambda-powertools/logger';
+import { injectLambdaContext } from '@aws-lambda-powertools/logger/middleware';
+
 import middy from '@middy/core';
-import httpJsonBodyParser from '@middy/http-json-body-parser';
-import { injectLambdaContext } from '@aws-lambda-powertools/logger';
-import { captureLambdaHandler } from '@aws-lambda-powertools/tracer';
-import { logger } from '../../utils/logger';
-import { tracer } from '../../utils/tracer';
+
 import { CreateUrlHashUseCase } from '../../usecases/create-url-hash.usecase';
 import { urlHashRepository } from '../../utils/dependencies';
 import { CreateUrlHashRequest } from '../../dto/url-hash.dto';
+
+const logger = new Logger();
+const tracer = new Tracer();
+const metrics = new Metrics();
 
 const usecase = new CreateUrlHashUseCase(urlHashRepository);
 
@@ -47,6 +54,6 @@ export const createUrlHashHandler = async (
 
 // Export the handler with middleware
 export const handler = middy(createUrlHashHandler)
-  .use(httpJsonBodyParser())
-  .use(injectLambdaContext(logger, { clearState: true }))
-  .use(captureLambdaHandler(tracer));
+  .use(injectLambdaContext(logger))
+  .use(captureLambdaHandler(tracer))
+  .use(logMetrics(metrics));

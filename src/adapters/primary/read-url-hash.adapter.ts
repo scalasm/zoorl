@@ -5,13 +5,24 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
+import { Metrics, MetricUnit } from '@aws-lambda-powertools/metrics';
+import { logMetrics } from '@aws-lambda-powertools/metrics/middleware';
+
+import { Tracer } from '@aws-lambda-powertools/tracer';
+import { captureLambdaHandler } from '@aws-lambda-powertools/tracer/middleware';
+
+import { Logger } from '@aws-lambda-powertools/logger';
+import { injectLambdaContext } from '@aws-lambda-powertools/logger/middleware';
+
 import middy from '@middy/core';
-import { injectLambdaContext } from '@aws-lambda-powertools/logger';
-import { captureLambdaHandler, captureMethod } from '@aws-lambda-powertools/tracer';
-import { logger } from '../../utils/logger';
-import { tracer } from '../../utils/tracer';
+
 import { ReadUrlHashUseCase, UrlHashNotFoundError } from '../../usecases/read-url-hash.usecase';
 import { urlHashRepository } from '../../utils/dependencies';
+
+
+const logger = new Logger();
+const tracer = new Tracer();
+const metrics = new Metrics();
 
 const usecase = new ReadUrlHashUseCase(urlHashRepository);
 
@@ -66,5 +77,6 @@ export const readUrlHashHandler = async (
 
 // Export the handler with middleware
 export const handler = middy(readUrlHashHandler)
-  .use(injectLambdaContext(logger, { clearState: true }))
-  .use(captureLambdaHandler(tracer));
+  .use(injectLambdaContext(logger))
+  .use(captureLambdaHandler(tracer))
+  .use(logMetrics(metrics));

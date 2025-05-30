@@ -40,3 +40,5 @@ It is a contraction of "Zipped URL", with "u" replaced by "oo" to be "cooler" :P
 ## Why another URL shortener project?
 
 Just for learning, not need to compete with more famed solutions like [bit.ly](https://bitly.com/) and others. And maybe other people may find it useful too, you never know :)
+
+
