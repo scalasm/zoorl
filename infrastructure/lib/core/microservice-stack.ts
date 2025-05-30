@@ -101,7 +101,7 @@ export class CoreMicroserviceStack extends cdk.NestedStack implements IObservabi
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
       },
-      runtime: lambda.Runtime.PYTHON_3_9,
+      runtime: lambda.Runtime.PYTHON_3_12,
       entry: "../src/zoorl/",
       handler: "handle",
       environment: {

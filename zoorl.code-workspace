@@ -7,7 +7,7 @@
 			"path": "infrastructure"
 		},
 		{
-			"path": "src/zoorl"
+			"path": "src"
 		}
 	],
 	"settings": {}

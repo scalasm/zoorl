@@ -1,1 +1,0 @@
-"""Zoorl core application logic."""
