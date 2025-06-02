@@ -62,6 +62,21 @@ export class ZoorlApplicationStack extends cdk.Stack {
       ],
     });
 
+    new cdk.CfnOutput(this, "IdentityPoolId", {
+      exportName: "IdentityPoolId",
+      value: authStack.identityPool.ref || "",
+    });
+    new cdk.CfnOutput(this, "UserPoolClientId", {
+      exportName: "UserPoolClientId",
+      value: authStack.userPoolClient.userPoolClientId || "",
+    });
+    new cdk.CfnOutput(this, "UserPoolId", {
+      exportName: "UserPoolId",
+      value: authStack.userPool.userPoolId || "",
+    });
+    new cdk.CfnOutput(this, "Region", {
+      value: authStack.region || "",
+    });
   }
 
   private buildRestApi(): apigateway.RestApi {

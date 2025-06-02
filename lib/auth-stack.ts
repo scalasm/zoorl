@@ -24,12 +24,6 @@ export class AuthStack extends cdk.NestedStack {
   public readonly userPoolClient: cognito.UserPoolClient;
   public readonly identityPool: cognito.CfnIdentityPool;
 
-  public readonly userPoolIdOutput: cdk.CfnOutput;
-  public readonly userPoolClientIdOutput: cdk.CfnOutput;
-  public readonly identityPoolIdOutput: cdk.CfnOutput;
-
-  public readonly regionOutput: cdk.CfnOutput;
-
   constructor(scope: constructs.Construct, id: string, props?: AuthStackProps) {
     super(scope, id, props);
 
@@ -45,6 +39,7 @@ export class AuthStack extends cdk.NestedStack {
     this.userPoolClient = new cognito.UserPoolClient(this, "user-pool-client", {
       userPool: this.userPool,
       authFlows: {
+        userPassword: true, // Allow users to sign in with username and password
         adminUserPassword: true,
         userSrp: true,
       },
@@ -60,22 +55,6 @@ export class AuthStack extends cdk.NestedStack {
           providerName: this.userPool.userPoolProviderName,
         },
       ],
-    });
-
-    this.identityPoolIdOutput = new cdk.CfnOutput(this, "IdentityPoolId", {
-      exportName: "IdentityPoolId",
-      value: this.identityPool.ref || "",
-    });
-    this.userPoolClientIdOutput = new cdk.CfnOutput(this, "UserPoolClientId", {
-      exportName: "UserPoolClientId",
-      value: this.userPoolClient.userPoolClientId || "",
-    });
-    this.userPoolIdOutput = new cdk.CfnOutput(this, "UserPoolId", {
-      exportName: "UserPoolId",
-      value: this.userPool.userPoolId || "",
-    });
-    this.regionOutput = new cdk.CfnOutput(this, "Region", {
-      value: this.region || "",
     });
   }
 }
