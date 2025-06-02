@@ -14,7 +14,7 @@ import { OrganizationsHelper } from "./pipeline-helpers";
  * CI/CD pipeline.
  */
 export class ZoorlPipelineStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     // Set your Github username and repository name
@@ -77,7 +77,7 @@ export class ZoorlPipelineStack extends cdk.Stack {
         }
 
         pipeline.addStage(
-          new ApplicationStage(this, stageDetails.name, {
+          new ApplicationStage(scope, stageDetails.name, {
             stageName: stageDetails.name,
             env: {
               account: stageDetails.accountId

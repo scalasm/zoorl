@@ -4,9 +4,16 @@
 
 import * as cdk from "aws-cdk-lib";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
-import { Dashboard, Metric, GraphWidget, TextWidget } from "aws-cdk-lib/aws-cloudwatch";
+import {
+  Dashboard,
+  Metric,
+  GraphWidget,
+  TextWidget,
+} from "aws-cdk-lib/aws-cloudwatch";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as ddb from "aws-cdk-lib/aws-dynamodb";
+import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as events from 'aws-cdk-lib/aws-events';
 
 /**
  * Half horizontal screen space within a Cloudwatch dashboard space.
@@ -76,6 +83,20 @@ export interface DynamoDBTableSectionProps extends BaseSectionProps {
 }
 
 /**
+ * Configuration properties for Cloudwatch section about a REST API implemented on the API Gateway.
+ */
+export interface ApiGatewayRESTApiProps extends BaseSectionProps {
+  readonly restApi: apigateway.RestApi;
+}
+
+/**
+ * Configuration properties for Cloudwatch section about an Event Bus.
+ */
+export interface EventBusApiProps extends BaseSectionProps {
+  readonly eventBus: events.EventBus;
+}
+
+/**
  * Helper for building dashboard sections in a standard way.
  */
 export class ObservabilityHelper {
@@ -89,7 +110,8 @@ export class ObservabilityHelper {
    * @param props configuration options for this section
    */
   public createLambdaFunctionSection(props: LambdaFunctionSectionProps): void {
-    const description = props.description || "Performance monitors for this lambda function.";
+    const description =
+      props.description || "Performance monitors for this lambda function.";
 
     this.dashboard.addWidgets(
       new TextWidget({
@@ -111,7 +133,9 @@ ${description}
           props.function.metricErrors({ period: STANDARD_RESOLUTION }),
           props.function.metricInvocations({ period: STANDARD_RESOLUTION }),
         ],
-        right: [props.function.metricThrottles({ period: STANDARD_RESOLUTION })],
+        right: [
+          props.function.metricThrottles({ period: STANDARD_RESOLUTION }),
+        ],
       }),
       new GraphWidget({
         title: "AWS Function URL Request Duration and Latency (p99)",
@@ -150,7 +174,8 @@ ${description}
   }
 
   public createDynamoDBTableSection(props: DynamoDBTableSectionProps): void {
-    const description = props.description || "Performance monitors for this DynamoDB table.";
+    const description =
+      props.description || "Performance monitors for this DynamoDB table.";
 
     this.dashboard.addWidgets(
       new TextWidget({
@@ -172,8 +197,95 @@ ${description}
         title: "DynamoDB Table consumed WCU/RCU",
         width: SIZE_FULL_WIDTH,
         left: [
-          props.table.metricConsumedReadCapacityUnits({ period: STANDARD_RESOLUTION }),
-          props.table.metricConsumedWriteCapacityUnits({ period: STANDARD_RESOLUTION }),
+          props.table.metricConsumedReadCapacityUnits({
+            period: STANDARD_RESOLUTION,
+          }),
+          props.table.metricConsumedWriteCapacityUnits({
+            period: STANDARD_RESOLUTION,
+          }),
+        ],
+      })
+    );
+  }
+
+  public createApiGatewayRestApiSection(props: ApiGatewayRESTApiProps): void {
+    const description =
+      props.description || "Peformance metrics for the API Gateway supporting the REST API.";
+
+    // API Gateway (REST API) is shared resource across different microservices
+    // TODO In future we may want to add "resource" dimensions so that we can track errors for
+    // specific microservices.
+    this.dashboard.addWidgets(
+      new TextWidget({
+        markdown: `
+# REST API metrics 
+${description}
+
+## Metadata
+* name: ${props.restApi.restApiName}
+* Domain name: ${props.restApi.domainName?.domainName}
+`,
+        width: SIZE_FULL_WIDTH,
+        height: 4, // Increase this if you want to avoid vscrolls for long text
+      })
+    );
+
+    this.dashboard.addWidgets(
+      new GraphWidget({
+        title: "APIGateway requests, client errors, and server errors",
+        width: SIZE_FULL_WIDTH,
+        left: [props.restApi.metricCount({ period: STANDARD_RESOLUTION })],
+        right: [
+          props.restApi.metricClientError({ period: STANDARD_RESOLUTION }),
+          props.restApi.metricServerError({ period: STANDARD_RESOLUTION }),
+        ],
+      }),
+      new GraphWidget({
+        title: "APIGateway latency",
+        width: SIZE_FULL_WIDTH,
+        left: [
+          props.restApi.metricLatency({
+            period: STANDARD_RESOLUTION,
+            statistic: "p99",
+            label: "p99 latency",
+          }),
+        ],
+      })
+    );
+  }
+
+  createEventBusSection(props: EventBusApiProps): void {
+    const description =
+      props.description || "Usage metrics for the event bus.";
+
+    this.dashboard.addWidgets(
+      new TextWidget({
+        markdown: `
+# REST API metrics 
+${description}
+
+## Metadata
+* name: ${props.eventBus.eventBusName}
+* ARN: ${props.eventBus.eventBusArn}
+`,
+        width: SIZE_FULL_WIDTH,
+        height: 4, // Increase this if you want to avoid vscrolls for long text
+      })
+    );    
+    // Example: Add a simple widget for event bus metrics
+    this.dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: `${props.descriptiveName} - Events Published`,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/Events',
+            metricName: 'PutEvents',
+            dimensionsMap: {
+              EventBusName: props.eventBus.eventBusName,
+            },
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
         ],
       })
     );

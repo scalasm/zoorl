@@ -3,8 +3,12 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import * as cdk from "aws-cdk-lib";
-import { ZoorlApplicationStack } from "../zoorl-application-stack";
 import { Construct } from "constructs";
+
+import { getStage, Stage } from "@config/types";
+import { getEnvironmentConfig } from "@config/environment-config";
+
+import { ZoorlApplicationStack } from "../zoorl-application-stack";
 
 export interface ApplicationStageProps extends cdk.StageProps {
 }
@@ -20,11 +24,16 @@ export class ApplicationStage extends cdk.Stage {
   public readonly identityPoolIdOutput: cdk.CfnOutput;
   public readonly regionOutput: cdk.CfnOutput;
 
-  constructor(scope: Construct, id: string, props: ApplicationStageProps) {
+  constructor(scope: cdk.App, id: string, props: ApplicationStageProps) {
     super(scope, id, props);
 
+    const stage = getStage(process.env.STAGE as Stage) as Stage;
+    const appConfig = getEnvironmentConfig(stage, scope);
+
     const applicationStack = new ZoorlApplicationStack(this, "application-stack", {
-      stage: props.stageName!,
+      env: appConfig.env,
+      appConfig: appConfig,
+      description: `My AWS Serverless Kata Stack for stage ${stage}`
     });
 
     // Expose application details for this stage: API URL and auth

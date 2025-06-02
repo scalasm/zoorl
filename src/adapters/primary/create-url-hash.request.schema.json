@@ -1,13 +1,15 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "url": {
-      "type": "string"
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "CreateUrlHashRequest",
+    "type": "object",
+    "properties": {
+        "url": {
+            "type": "string"
+        },
+        "ttl": {
+            "type": "number"
+        }
     },
-    "ttl": {
-      "type": "integer"
-    }
-  },
-  "required": ["url"]
+    "required": ["url"],
+    "additionalProperties": false
 }

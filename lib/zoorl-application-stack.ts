@@ -7,8 +7,11 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { Construct } from "constructs";
 import { NetworkStack } from "./network-stack";
 import { AuthStack } from "./auth-stack";
-import { StatelessStack } from "./core/microservice-stack";
+import { StatelessStack } from "./stateless-stack";
 import { ObservabilityStack } from "./observability-stack";
+
+import { EnvironmentConfig } from "./config/environment-config";
+import { StatefulStack } from "./stateful-stack";
 
 /**
  * Configuration properties for ZoorlInfrastructureStack instances.
@@ -17,7 +20,7 @@ export interface ZoorlApplicationStackProps extends cdk.StackProps {
   /**
    * Stage name for the stack (e.g., "dev", "prod", ...)
    */
-  readonly stage: string;
+  readonly appConfig: EnvironmentConfig;
 }
 
 /**
@@ -40,19 +43,25 @@ export class ZoorlApplicationStack extends cdk.Stack {
       cognitoUserPools: [authStack.userPool],
     });
 
-    const observableStacks = [
-      new StatelessStack(this, "core-microservice", {
-        vpc: networkStack.vpc,
-        restApi: restApi,
-        authorizer: restApiAuthorizer,
-      }),
-    ];
-
-    const observabilityStack = new ObservabilityStack(this, "observability", {
-      stage: props.stage,
-      restApi: restApi,
+    const statefulStack = new StatefulStack(this, "stateful", {
+      appConfig: props.appConfig,
     });
-    observabilityStack.hookDashboardContributions(observableStacks);
+
+    const statelessStack = new StatelessStack(this, "stateless", {
+      vpc: networkStack.vpc,
+      restApi: restApi,
+      authorizer: restApiAuthorizer,
+      urlHashesTable: statefulStack.urlHashesTable,
+    });
+
+    new ObservabilityStack(this, "observability", {
+      dashboardName: `Zoorl (${props?.appConfig.shared.stage})`,
+      contributors: [
+        statelessStack,
+        statefulStack,
+      ],
+    });
+
   }
 
   private buildRestApi(): apigateway.RestApi {

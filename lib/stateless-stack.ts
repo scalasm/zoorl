@@ -11,14 +11,13 @@ import * as constructs from "constructs";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambda_nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
-import * as ddb from "aws-cdk-lib/aws-dynamodb";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 
-import { jsonSchema } from "../shared/common-utils";
-import { IObservabilityContributor, ObservabilityHelper } from "../shared/common-observability";
+import { IObservabilityContributor, ObservabilityHelper } from "./shared/observability";
 
 /**
- * Configuration properties for the CoreMicroserviceStack.
+ * Configuration properties for the Stateless stack.
  */
 export interface StatelessStackProps extends cdk.NestedStackProps {
   /**
@@ -34,6 +33,11 @@ export interface StatelessStackProps extends cdk.NestedStackProps {
    * Authorizer for API calls - if endpoints are to be protected, this is the authorizer to use.
    */
   readonly authorizer: apigateway.Authorizer;
+  
+  /**
+   * DynamoDB table where URL hashes will be stored.
+   */	
+  urlHashesTable: dynamodb.Table;
 }
 
 interface CommonResponseModels {
@@ -42,7 +46,7 @@ interface CommonResponseModels {
 }
 
 // Define a constant for the adapters/primary directory
-const PRIMARY_ADAPTERS = "../../src/adapters/primary";
+const PRIMARY_ADAPTERS = "../src/adapters/primary";
 
 /**
  * Core Zoorl logic for managing the creation of URL hashes and their retrieval through
@@ -54,7 +58,6 @@ const PRIMARY_ADAPTERS = "../../src/adapters/primary";
  *    to trigger browser redirection.
  */
 export class StatelessStack extends cdk.NestedStack implements IObservabilityContributor {
-  private readonly urlHashesTable: ddb.Table;
 
   private readonly urlHashesResource: apigateway.Resource;
   private readonly redirectResource: apigateway.Resource;
@@ -73,21 +76,6 @@ export class StatelessStack extends cdk.NestedStack implements IObservabilityCon
     super(scope, id, props);
 
     this.restApi = props.restApi;
-
-    this.urlHashesTable = new ddb.Table(this, "UrlHashesTable", {
-      tableName: "UrlHashes",
-      billingMode: ddb.BillingMode.PAY_PER_REQUEST,
-      partitionKey: {
-        name: "PK",
-        type: ddb.AttributeType.STRING,
-      },
-      sortKey: {
-        name: "SK",
-        type: ddb.AttributeType.STRING,
-      },
-      timeToLiveAttribute: "ttl",
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
 
     const lambdaPowerToolsConfig = {
       LOG_LEVEL: 'DEBUG',
@@ -118,7 +106,7 @@ export class StatelessStack extends cdk.NestedStack implements IObservabilityCon
       },
       environment: {
         ...lambdaPowerToolsConfig,
-        URL_HASHES_TABLE: this.urlHashesTable.tableName
+        URL_HASHES_TABLE: props.urlHashesTable.tableName
       }
     };
 
@@ -151,24 +139,11 @@ export class StatelessStack extends cdk.NestedStack implements IObservabilityCon
       function: this.redirectToUrlFunction,
       descriptiveName: "Redirect to URL",
     });
-
-    observabilityHelper.createDynamoDBTableSection({
-      table: this.urlHashesTable,
-      descriptiveName: "URL hashes table",
-    });
   }
 
   private initializeSharedResponseModels(props: StatelessStackProps): CommonResponseModels {
-    const http404NotFoundResponseModel = props.restApi.addModel(
-      "Http404ResponseModel",
-      jsonSchema({
-        modelName: "Http404ResponseModel",
-        properties: {
-          message: { type: apigateway.JsonSchemaType.STRING },
-        },
-        requiredProperties: ["message"],
-      })
-    );
+    const http404NotFoundResponseModel = this.createModelFromJsonSchemaFile(
+      path.join(PRIMARY_ADAPTERS, "resource-not-found.response.schema.json"), "Http404Response");
 
     const readUrlHashResponseModel = this.createModelFromJsonSchemaFile(`${PRIMARY_ADAPTERS}/read-url-hash.response.schema.json`, "ReadUrlHashResponse")
 
@@ -185,7 +160,7 @@ export class StatelessStack extends cdk.NestedStack implements IObservabilityCon
       handler: 'handler',
       entry: path.join(__dirname, `${PRIMARY_ADAPTERS}/create-url-hash.adapter.ts`),
     });
-    this.urlHashesTable.grantWriteData(createUrlHashFunction);
+    props.urlHashesTable.grantWriteData(createUrlHashFunction);
 
     // POST /u
     const requestModel = this.createModelFromJsonSchemaFile(`${PRIMARY_ADAPTERS}/create-url-hash.request.schema.json`, "CreateUrlHashRequest");
@@ -226,7 +201,7 @@ export class StatelessStack extends cdk.NestedStack implements IObservabilityCon
       entry: path.join(__dirname, `${PRIMARY_ADAPTERS}/redirect.adapter.ts`),
     });
 
-    this.urlHashesTable.grantReadData(readUrlHashFunction);
+    props.urlHashesTable.grantReadData(readUrlHashFunction);
 
     // GET /u/{url_hash}
     this.urlHashesResource
@@ -261,7 +236,7 @@ export class StatelessStack extends cdk.NestedStack implements IObservabilityCon
       entry: path.join(__dirname, `${PRIMARY_ADAPTERS}/redirect.adapter.ts`),
     });
 
-    this.urlHashesTable.grantReadData(redirectToUrlFunction);
+    props.urlHashesTable.grantReadData(redirectToUrlFunction);
     // GET /r/{url_hash}
     this.redirectResource
       .addResource("{url_hash}")

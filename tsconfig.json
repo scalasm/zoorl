@@ -29,7 +29,9 @@
       "@adapters/*": ["./src/adapters/*"],
       "@utils/*": ["./src/utils/*"],
       "@usecases/*": ["./src/usecases/*"],
-      "@dto/*": ["./src/dto/*"]
+      "@dto/*": ["./src/dto/*"],
+      "@config/*": ["./lib/config/*"],
+      "@shared/*": ["./lib/shared/*"]
     }
   },
   "exclude": [

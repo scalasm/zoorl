@@ -3,16 +3,24 @@ import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 
+import { getEnvironmentConfig } from "../lib/config/environment-config";
+import { getStage, Stage } from "../lib/config/types";
+
 import { ZoorlApplicationStack } from "../lib/zoorl-application-stack";
 import { ZoorlPipelineStack } from "../lib/cicd/pipeline-stack";
 
 const app = new cdk.App();
 
+const stage = getStage(process.env.STAGE as Stage) as Stage;
+const appConfig = getEnvironmentConfig(stage, app);
+
 // This is an application stack for personal development - it is separated from
 // the other staged stacks that will be handled by the pipeline.
 new ZoorlApplicationStack(app, "ZoorlPersonalStack", {
-  stage: "personal",
-});
+    env: appConfig.env,
+    appConfig: appConfig,
+    description: `My AWS Serverless Kata Stack for stage ${stage}`
+  });
 
 // // CI/CD pipeline stack
 // const pipelineStack = new ZoorlPipelineStack(app, "ZoorlPipelineStack");
