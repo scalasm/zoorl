@@ -67,9 +67,9 @@ export class ZoorlApplicationStack extends cdk.Stack {
   private buildRestApi(): apigateway.RestApi {
     const api = new apigateway.RestApi(this, "api", {
       restApiName: "Zoorl API",
-      description: "Zoorl API",
+      description: "A simple URL shortening service",
       deployOptions: {
-        stageName: "dev",
+        stageName: "v1",
       },
       // 👇 enable CORS
       defaultCorsPreflightOptions: {
